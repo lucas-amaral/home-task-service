@@ -6,7 +6,10 @@ buildCommand = "./gradlew bootJar"
 NIXPACKS_JDK_VERSION = "17"
 
 [deploy]
-startCommand = "java -Dspring.profiles.active=prod -jar build/libs/home-task-service.jar"
+startCommand = "java -jar build/libs/home-task-service.jar"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
+
+# SPRING_PROFILES_ACTIVE=prod must also be set as an environment variable
+# in the Railway dashboard — see DEPLOY.md
