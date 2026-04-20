@@ -1,18 +1,12 @@
 package com.amaral.hometask.repository
 
-import com.amaral.hometask.model.Assignee
-import com.amaral.hometask.model.Assignment
-import com.amaral.hometask.model.PointLedger
-import com.amaral.hometask.model.Task
-import com.amaral.hometask.model.TaskFrequency
-import com.amaral.hometask.model.TaskType
+import com.amaral.hometask.model.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDate
-import java.time.LocalDateTime
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -47,16 +41,6 @@ class AssignmentRepositoryTest {
     }
 
     @Test
-    fun `findByTaskIdAndPeriodWeek returns correct weekly assignment`() {
-        val task = saveTask(frequency = TaskFrequency.WEEKLY)
-        assignmentRepo.save(Assignment(task = task, assignedTo = Assignee.CHILD2, periodWeek = monday))
-
-        val found = assignmentRepo.findByTaskIdAndPeriodWeek(task.id, monday)
-        assertNotNull(found)
-        assertEquals(Assignee.CHILD2, found!!.assignedTo)
-    }
-
-    @Test
     fun `findAllForWeek returns both daily and weekly assignments`() {
         val daily  = saveTask("Daily",  TaskFrequency.DAILY)
         val weekly = saveTask("Weekly", TaskFrequency.WEEKLY)
@@ -66,19 +50,6 @@ class AssignmentRepositoryTest {
 
         val results = assignmentRepo.findAllForWeek(monday, monday.plusDays(7))
         assertEquals(2, results.size)
-    }
-
-    @Test
-    fun `findCompletedBetween only returns completed assignments`() {
-        val task = saveTask()
-        assignmentRepo.save(Assignment(task = task, assignedTo = Assignee.CHILD1,
-                                       periodDate = monday, completedAt = LocalDateTime.now()))
-        assignmentRepo.save(Assignment(task = task, assignedTo = Assignee.CHILD2,
-                                       periodDate = tuesday))  // not completed
-
-        val results = assignmentRepo.findCompletedBetween(monday, tuesday.plusDays(1))
-        assertEquals(1, results.size)
-        assertNotNull(results[0].completedAt)
     }
 
     @Test

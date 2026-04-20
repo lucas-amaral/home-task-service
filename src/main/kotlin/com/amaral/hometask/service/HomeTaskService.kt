@@ -1,22 +1,6 @@
 package com.amaral.hometask.service
 
-import com.amaral.hometask.model.AssignRequest
-import com.amaral.hometask.model.Assignee
-import com.amaral.hometask.model.Assignment
-import com.amaral.hometask.model.AssignmentDto
-import com.amaral.hometask.model.BoardDto
-import com.amaral.hometask.model.CompleteRequest
-import com.amaral.hometask.model.CreateTaskRequest
-import com.amaral.hometask.model.FamilyConfig
-import com.amaral.hometask.model.FamilyConfigDto
-import com.amaral.hometask.model.PointLedger
-import com.amaral.hometask.model.PointLedgerDto
-import com.amaral.hometask.model.RewardDto
-import com.amaral.hometask.model.Task
-import com.amaral.hometask.model.TaskDto
-import com.amaral.hometask.model.TaskFrequency
-import com.amaral.hometask.model.UpdateFamilyConfigRequest
-import com.amaral.hometask.model.WeekSummaryDto
+import com.amaral.hometask.model.*
 import com.amaral.hometask.repository.*
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -34,7 +18,7 @@ class HomeTaskService(
     private val familyConfigRepo: FamilyConfigRepository
 ) {
 
-    // ── Date helpers ────────────────────────────────────────────────────────
+    // ── Date helpers ─────────────────────────────────────────────────────────
 
     fun today(): LocalDate = LocalDate.now()
 
@@ -72,90 +56,68 @@ class HomeTaskService(
             )
         ).toDto()
 
-    // ── Board ─────────────────────────────────────────────────────────────────
+    // ── Board ────────────────────────────────────────────────────────────────
 
     /**
-     * Returns today's daily assignments + this week's weekly assignments.
-     * Creates missing Assignment rows on the fly (auto-populate from defaultAssignee).
+     * Returns today's daily + this week's weekly assignments.
+     *
+     * Duplicate prevention strategy:
+     *   1. Try native INSERT ... ON CONFLICT DO NOTHING (idempotent upsert).
+     *   2. Then SELECT to return the existing/newly created row.
+     *
+     * This eliminates race conditions entirely — even if two requests arrive
+     * simultaneously, only one row is ever inserted per (task × period).
      */
     @Transactional
     fun getBoard(date: LocalDate = today()): BoardDto {
         val week = weekStart(date)
-        val cfg = getFamilyConfig()
+        val cfg  = getFamilyConfig()
         val tasks = taskRepo.findByActiveTrueOrderBySortOrderAsc()
 
         val assignments = tasks.flatMap { task ->
             when (task.frequency) {
-                TaskFrequency.DAILY ->
-                    listOf(ensureDailyAssignment(task, date))
-                TaskFrequency.WEEKLY ->
-                    listOf(ensureWeeklyAssignment(task, week))
+                TaskFrequency.DAILY    -> listOf(ensureDailyAssignment(task, date))
+                TaskFrequency.WEEKLY   -> listOf(ensureWeeklyAssignment(task, week))
                 TaskFrequency.BIWEEKLY -> {
-                    // show only on even weeks (rough heuristic)
                     val weekNumber = week.dayOfYear / 7
                     if (weekNumber % 2 == 0) listOf(ensureWeeklyAssignment(task, week)) else emptyList()
                 }
-                TaskFrequency.MONTHLY -> {
-                    // show only on the first week of each month
+                TaskFrequency.MONTHLY  -> {
                     if (week.dayOfMonth <= 7) listOf(ensureWeeklyAssignment(task, week)) else emptyList()
                 }
             }
         }
 
-        val weekPoints = calculateWeekPoints(week)
-
         return BoardDto(
-            date = date,
-            weekStart = week,
-            child1Name = cfg.child1Name,
-            child2Name = cfg.child2Name,
+            date = date, weekStart = week,
+            child1Name = cfg.child1Name, child2Name = cfg.child2Name,
             assignments = assignments.map { it.toDto() },
-            weekPoints = mapOf(
-                "CHILD1" to (weekPoints[Assignee.CHILD1] ?: 0),
-                "CHILD2" to (weekPoints[Assignee.CHILD2] ?: 0)
-            )
+            weekPoints  = weekPointsMap(week)
         )
     }
 
     private fun ensureDailyAssignment(task: Task, date: LocalDate): Assignment {
-        return assignmentRepo.findByTaskIdAndPeriodDate(task.id, date)
-            ?: assignmentRepo.save(
-                Assignment(
-                    task = task,
-                    assignedTo = task.defaultAssignee,
-                    periodDate = date
-                )
-            )
+        // Step 1: idempotent insert — does nothing if row already exists
+        assignmentRepo.upsertDaily(task.id, task.defaultAssignee.name, date)
+        // Step 2: return the (possibly pre-existing) row — always exactly one
+        return assignmentRepo.findAllByTaskIdAndPeriodDate(task.id, date).first()
     }
 
     private fun ensureWeeklyAssignment(task: Task, weekStart: LocalDate): Assignment {
-        return assignmentRepo.findByTaskIdAndPeriodWeek(task.id, weekStart)
-            ?: assignmentRepo.save(
-                Assignment(
-                    task = task,
-                    assignedTo = task.defaultAssignee,
-                    periodWeek = weekStart
-                )
-            )
+        assignmentRepo.upsertWeekly(task.id, task.defaultAssignee.name, weekStart)
+        return assignmentRepo.findAllByTaskIdAndPeriodWeek(task.id, weekStart).first()
     }
 
-    // ── Week summary (history page) ──────────────────────────────────────────
+    // ── Week summary ─────────────────────────────────────────────────────────
 
     fun getWeekSummary(weekStart: LocalDate): WeekSummaryDto {
         val cfg = getFamilyConfig()
-        val weekEnd = weekStart.plusDays(7)
-        val assignments = assignmentRepo.findAllForWeek(weekStart, weekEnd)
-        val points = calculateWeekPoints(weekStart)
-
+        val assignments = assignmentRepo.findAllForWeek(weekStart, weekStart.plusDays(7))
         return WeekSummaryDto(
             weekStart = weekStart,
-            child1Name = cfg.child1Name,
-            child2Name = cfg.child2Name,
+            child1Name = cfg.child1Name, child2Name = cfg.child2Name,
             assignments = assignments.map { it.toDto() },
-            points = mapOf(
-                "CHILD1" to (points[Assignee.CHILD1] ?: 0),
-                "CHILD2" to (points[Assignee.CHILD2] ?: 0)
-            )
+            points = weekPointsMap(weekStart)
         )
     }
 
@@ -163,30 +125,24 @@ class HomeTaskService(
 
     @Transactional
     fun assignTask(req: AssignRequest): AssignmentDto {
-        require(req.date != null || req.weekStart != null) { "Either date or weekStart must be provided" }
-
+        require(req.date != null || req.weekStart != null) {
+            "Either date or weekStart must be provided"
+        }
         val task = taskRepo.findById(req.taskId)
             .orElseThrow { NoSuchElementException("Task ${req.taskId} not found") }
 
         val existing = if (req.date != null)
-            assignmentRepo.findByTaskIdAndPeriodDate(task.id, req.date)
+            assignmentRepo.findAllByTaskIdAndPeriodDate(task.id, req.date).firstOrNull()
         else
-            assignmentRepo.findByTaskIdAndPeriodWeek(task.id, req.weekStart!!)
+            assignmentRepo.findAllByTaskIdAndPeriodWeek(task.id, req.weekStart!!).firstOrNull()
 
         val assignment = if (existing != null) {
-            // If already completed, subtract old points before re-assigning
-            if (existing.completedAt != null) {
-                reversePoints(existing)
-            }
+            if (existing.completedAt != null) reversePoints(existing)
             assignmentRepo.save(existing.copy(assignedTo = req.assignedTo, completedAt = null, bonusEarned = false))
         } else {
             assignmentRepo.save(
-                Assignment(
-                    task = task,
-                    assignedTo = req.assignedTo,
-                    periodDate = req.date,
-                    periodWeek = req.weekStart
-                )
+                Assignment(task = task, assignedTo = req.assignedTo,
+                    periodDate = req.date, periodWeek = req.weekStart)
             )
         }
         return assignment.toDto()
@@ -196,7 +152,6 @@ class HomeTaskService(
     fun completeAssignment(id: Long, req: CompleteRequest): AssignmentDto {
         val assignment = findAssignment(id)
         check(assignment.completedAt == null) { "Assignment already completed" }
-
         val updated = assignmentRepo.save(
             assignment.copy(completedAt = LocalDateTime.now(), bonusEarned = req.bonusEarned)
         )
@@ -208,38 +163,67 @@ class HomeTaskService(
     fun uncompleteAssignment(id: Long): AssignmentDto {
         val assignment = findAssignment(id)
         if (assignment.completedAt == null) return assignment.toDto()
-
         reversePoints(assignment)
-        val updated = assignmentRepo.save(assignment.copy(completedAt = null, bonusEarned = false))
-        return updated.toDto()
+        return assignmentRepo.save(assignment.copy(completedAt = null, bonusEarned = false)).toDto()
     }
 
     @Transactional
     fun applyPenalty(id: Long): AssignmentDto {
         val assignment = findAssignment(id)
         val week = weekStart(assignment.displayDate)
-        val targets = resolvePersons(assignment.assignedTo)
-        targets.forEach { addLedger(it, week, -1, "Penalty: ${assignment.task.name}") }
-        val updated = assignmentRepo.save(assignment.copy(penaltyApplied = true))
-        return updated.toDto()
+        resolvePersons(assignment.assignedTo)
+            .forEach { addLedger(it, week, -1, "Manual penalty: ${assignment.task.name}") }
+        return assignmentRepo.save(assignment.copy(penaltyApplied = true)).toDto()
     }
 
     // ── Points ───────────────────────────────────────────────────────────────
 
-    fun getPointsHistory(): List<PointLedgerDto> {
-        val raw = ledgerRepo.findAllOrderByWeekDesc()
-        // Aggregate by week+assignee
-        return raw.groupBy { it.weekStart to it.assignee }
-            .map { (key, entries) ->
-                PointLedgerDto(key.second, key.first, entries.sumOf { it.delta })
-            }
+    fun getPointsHistory(): List<PointLedgerDto> =
+        ledgerRepo.findAllOrderByWeekDesc()
+            .groupBy { it.weekStart to it.assignee }
+            .map { (key, entries) -> PointLedgerDto(key.second, key.first, entries.sumOf { it.delta }) }
             .sortedByDescending { it.weekStart }
-    }
 
     // ── Rewards ──────────────────────────────────────────────────────────────
 
     fun listRewards(): List<RewardDto> =
         rewardRepo.findByActiveTrue().map { RewardDto(it.id, it.name, it.pointsCost, it.emoji) }
+
+    // ── Cron: missed-deadline penalties ──────────────────────────────────────
+
+    /**
+     * Called at 23:30 every day by [DeadlinePenaltyScheduler].
+     *
+     * Rules:
+     *   - Daily assignments that are not completed and not already penalised → −1 pt
+     *   - Weekly assignments are penalised only on Sunday night (end of the week)
+     *   - UNASSIGNED and BOTH assignments are skipped (no one to debit)
+     *
+     * Returns the number of penalties applied (useful for logging / testing).
+     */
+    @Transactional
+    fun applyMissedDeadlinePenalties(date: LocalDate = today()): Int {
+        val week = weekStart(date)
+        val isSunday = date.dayOfWeek == java.time.DayOfWeek.SUNDAY
+
+        val candidates = assignmentRepo.findMissedCandidates(date, week)
+            .filter { a ->
+                when (a.task.frequency) {
+                    // Daily tasks are penalised every night
+                    TaskFrequency.DAILY -> true
+                    // Weekly/Biweekly/Monthly: only penalise at end of week (Sunday)
+                    else -> isSunday
+                }
+            }
+
+        candidates.forEach { a ->
+            assignmentRepo.save(a.copy(missedDeadline = true, penaltyApplied = true))
+            resolvePersons(a.assignedTo)
+                .forEach { person -> addLedger(person, week, -1, "Missed deadline: ${a.task.name}") }
+        }
+
+        return candidates.size
+    }
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
@@ -249,35 +233,32 @@ class HomeTaskService(
     private fun awardPoints(assignment: Assignment) {
         val pts = assignment.task.points + if (assignment.bonusEarned) 1 else 0
         val week = weekStart(assignment.displayDate)
-        resolvePersons(assignment.assignedTo).forEach { person ->
-            addLedger(person, week, pts, "Complete: ${assignment.task.name}")
-        }
+        resolvePersons(assignment.assignedTo)
+            .forEach { addLedger(it, week, pts, "Completed: ${assignment.task.name}") }
     }
 
     private fun reversePoints(assignment: Assignment) {
         val pts = assignment.task.points + if (assignment.bonusEarned) 1 else 0
         val week = weekStart(assignment.displayDate)
-        resolvePersons(assignment.assignedTo).forEach { person ->
-            addLedger(person, week, -pts, "Reversed: ${assignment.task.name}")
-        }
+        resolvePersons(assignment.assignedTo)
+            .forEach { addLedger(it, week, -pts, "Reversed: ${assignment.task.name}") }
     }
 
     private fun addLedger(person: Assignee, week: LocalDate, delta: Int, reason: String) {
         ledgerRepo.save(PointLedger(assignee = person, weekStart = week, delta = delta, reason = reason))
     }
 
-    private fun calculateWeekPoints(week: LocalDate): Map<Assignee, Int> {
+    private fun weekPointsMap(week: LocalDate): Map<String, Int> {
         val entries = ledgerRepo.findByWeekStart(week)
-        return entries
-            .filter { it.assignee in listOf(Assignee.CHILD1, Assignee.CHILD2) }
-            .groupBy { it.assignee }
-            .mapValues { (_, v) -> maxOf(0, v.sumOf { it.delta }) }
+        return listOf(Assignee.CHILD1, Assignee.CHILD2).associate { person ->
+            person.name to maxOf(0, entries.filter { it.assignee == person }.sumOf { it.delta })
+        }
     }
 
     private fun resolvePersons(assignee: Assignee): List<Assignee> = when (assignee) {
-        Assignee.BOTH -> listOf(Assignee.CHILD1, Assignee.CHILD2)
+        Assignee.BOTH       -> listOf(Assignee.CHILD1, Assignee.CHILD2)
         Assignee.UNASSIGNED -> emptyList()
-        else -> listOf(assignee)
+        else                -> listOf(assignee)
     }
 
     // ── Mappers ──────────────────────────────────────────────────────────────

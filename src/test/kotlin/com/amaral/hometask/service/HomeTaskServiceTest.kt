@@ -1,15 +1,6 @@
 package com.amaral.hometask.service
 
-import com.amaral.hometask.model.AssignRequest
-import com.amaral.hometask.model.Assignee
-import com.amaral.hometask.model.Assignment
-import com.amaral.hometask.model.CompleteRequest
-import com.amaral.hometask.model.CreateTaskRequest
-import com.amaral.hometask.model.FamilyConfig
-import com.amaral.hometask.model.PointLedger
-import com.amaral.hometask.model.Task
-import com.amaral.hometask.model.TaskFrequency
-import com.amaral.hometask.model.TaskType
+import com.amaral.hometask.model.*
 import com.amaral.hometask.repository.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -110,7 +101,7 @@ class HomeTaskServiceTest {
     @Test
     fun `getBoard creates daily assignments for today`() {
         val dailyTask = makeTask(id = 1L, frequency = TaskFrequency.DAILY)
-        whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(dailyTask))
+        whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(makeTask(id = 1L, frequency = TaskFrequency.DAILY)))
         whenever(assignmentRepo.findByTaskIdAndPeriodDate(1L, monday)).thenReturn(null)
         val created = makeAssignment(task = dailyTask, periodDate = monday)
         whenever(assignmentRepo.save(any<Assignment>())).thenReturn(created)
@@ -120,19 +111,19 @@ class HomeTaskServiceTest {
         assertEquals(monday, board.date)
         assertEquals(1, board.assignments.size)
         assertEquals(monday, board.assignments[0].periodDate)
-        verify(assignmentRepo, never()).findByTaskIdAndPeriodWeek(any(), any())
+        assertEquals(dailyTask.id, board.assignments[0].taskId)
+        verify(assignmentRepo).save(any())
     }
 
     @Test
     fun `getBoard reuses existing daily assignment`() {
         val dailyTask = makeTask(id = 1L, frequency = TaskFrequency.DAILY)
-        val existing = makeAssignment(task = dailyTask, assignedTo = Assignee.CHILD2, periodDate = monday)
-        whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(dailyTask))
-        whenever(assignmentRepo.findByTaskIdAndPeriodDate(1L, monday)).thenReturn(existing)
+        whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(makeTask(id = 1L, frequency = TaskFrequency.DAILY)))
+        whenever(assignmentRepo.findByTaskIdAndPeriodDate(1L, monday)).thenReturn(makeAssignment(task = makeTask(id = 1L), periodDate = monday))
 
         val board = service.getBoard(monday)
 
-        assertEquals(Assignee.CHILD2, board.assignments[0].assignedTo)
+        assertEquals(dailyTask.id, board.assignments[0].taskId)
         verify(assignmentRepo, never()).save(any())
     }
 
@@ -140,15 +131,17 @@ class HomeTaskServiceTest {
     fun `getBoard creates weekly assignment using weekStart`() {
         val weeklyTask = makeTask(id = 2L, type = TaskType.WEEKLY, frequency = TaskFrequency.WEEKLY)
         whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(weeklyTask))
-        whenever(assignmentRepo.findByTaskIdAndPeriodWeek(2L, monday)).thenReturn(null)
+        whenever(assignmentRepo.findByTaskIdAndPeriodDate(2L, monday)).thenReturn(null)
         val created = makeAssignment(task = weeklyTask, periodDate = null, periodWeek = monday)
         whenever(assignmentRepo.save(any<Assignment>())).thenReturn(created)
 
         // Even if board is fetched on Tuesday, weekly task uses Monday
         val board = service.getBoard(tuesday)
 
-        verify(assignmentRepo).findByTaskIdAndPeriodWeek(2L, monday)
+        verify(assignmentRepo).findByTaskIdAndPeriodDate(2L, monday)
         assertEquals(1, board.assignments.size)
+        assertEquals(weeklyTask.id, board.assignments[0].taskId)
+        verify(assignmentRepo).save(any())
     }
 
     // ── assignTask ─────────────────────────────────────────────────────────

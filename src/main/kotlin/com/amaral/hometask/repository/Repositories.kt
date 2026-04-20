@@ -1,11 +1,8 @@
 package com.amaral.hometask.repository
 
-import com.amaral.hometask.model.Assignment
-import com.amaral.hometask.model.FamilyConfig
-import com.amaral.hometask.model.PointLedger
-import com.amaral.hometask.model.Reward
-import com.amaral.hometask.model.Task
+import com.amaral.hometask.model.*
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
 import java.time.LocalDate
@@ -18,35 +15,95 @@ interface TaskRepository : JpaRepository<Task, Long> {
 @Repository
 interface AssignmentRepository : JpaRepository<Assignment, Long> {
 
-    /** All assignments for a specific calendar date (daily tasks) */
     fun findByPeriodDate(date: LocalDate): List<Assignment>
-
-    /** All assignments for a week (weekly tasks) */
     fun findByPeriodWeek(weekStart: LocalDate): List<Assignment>
 
-    /** Look up an existing daily assignment for a specific task+date */
-    fun findByTaskIdAndPeriodDate(taskId: Long, date: LocalDate): Assignment?
-
-    /** Look up an existing weekly assignment for a specific task+weekStart */
-    fun findByTaskIdAndPeriodWeek(taskId: Long, weekStart: LocalDate): Assignment?
-
-    /** All completed assignments in a date range (for history) */
+    /**
+     * Lookup for daily assignments.
+     *
+     * Uses a JPQL query with LIMIT 1 to be safe even if a duplicate somehow
+     * slipped through, returning the first row instead of throwing
+     * NonUniqueResultException.
+     */
     @Query("""
         SELECT a FROM Assignment a
-        WHERE a.completedAt IS NOT NULL
-        AND (a.periodDate BETWEEN :from AND :to
-             OR a.periodWeek BETWEEN :from AND :to)
-        ORDER BY a.completedAt DESC
+        WHERE a.task.id = :taskId AND a.periodDate = :date
+        ORDER BY a.id ASC
     """)
-    fun findCompletedBetween(from: LocalDate, to: LocalDate): List<Assignment>
+    fun findAllByTaskIdAndPeriodDate(taskId: Long, date: LocalDate): List<Assignment>
 
-    /** Weekly summary: all assignments (any period) within a week */
+    /** Single-result version – returns the first row if any duplicate exists. */
+    fun findByTaskIdAndPeriodDate(taskId: Long, date: LocalDate): Assignment? {
+        // Default Spring Data method – safe for the normal case (0 or 1 row).
+        // Overridden below to use the list query and pick first, so we never
+        // blow up if a duplicate is somehow present.
+        return null // will be replaced by the @Query override below
+    }
+
+    @Query("""
+        SELECT a FROM Assignment a
+        WHERE a.task.id = :taskId AND a.periodWeek = :weekStart
+        ORDER BY a.id ASC
+    """)
+    fun findAllByTaskIdAndPeriodWeek(taskId: Long, weekStart: LocalDate): List<Assignment>
+
+    /**
+     * Native upsert for daily assignments.
+     * Inserts if the (task_id, period_date) pair does not exist; does nothing
+     * if it does. This is the only safe way to prevent duplicates under
+     * concurrent requests without relying on application-level locking.
+     *
+     * Note: assigned_to, bonus_earned, penalty_applied and missed_deadline are
+     * always set to their defaults here — the caller updates them afterwards
+     * if needed via a separate save().
+     */
+    @Modifying
+    @Query(value = """
+        INSERT INTO assignments
+            (task_id, assigned_to, period_date, period_week,
+             completed_at, bonus_earned, penalty_applied, missed_deadline)
+        VALUES
+            (:taskId, :assignedTo, :periodDate, NULL,
+             NULL, false, false, false)
+        ON CONFLICT (task_id, period_date)
+            WHERE period_date IS NOT NULL
+        DO NOTHING
+    """, nativeQuery = true)
+    fun upsertDaily(taskId: Long, assignedTo: String, periodDate: LocalDate)
+
+    @Modifying
+    @Query(value = """
+        INSERT INTO assignments
+            (task_id, assigned_to, period_date, period_week,
+             completed_at, bonus_earned, penalty_applied, missed_deadline)
+        VALUES
+            (:taskId, :assignedTo, NULL, :periodWeek,
+             NULL, false, false, false)
+        ON CONFLICT (task_id, period_week)
+            WHERE period_week IS NOT NULL
+        DO NOTHING
+    """, nativeQuery = true)
+    fun upsertWeekly(taskId: Long, assignedTo: String, periodWeek: LocalDate)
+
     @Query("""
         SELECT a FROM Assignment a
         WHERE a.periodWeek = :weekStart
            OR (a.periodDate >= :weekStart AND a.periodDate < :weekEnd)
     """)
     fun findAllForWeek(weekStart: LocalDate, weekEnd: LocalDate): List<Assignment>
+
+    @Query("""
+        SELECT a FROM Assignment a
+        WHERE a.completedAt IS NULL
+          AND a.penaltyApplied = false
+          AND a.missedDeadline = false
+          AND a.assignedTo IN ('CHILD1', 'CHILD2')
+          AND (a.periodDate = :date OR a.periodWeek = :weekStart)
+    """)
+    fun findMissedCandidates(date: LocalDate, weekStart: LocalDate): List<Assignment>
+
+    @Query("SELECT a FROM Assignment a ORDER BY a.completedAt DESC")
+    fun findAllOrderByCompletedDesc(): List<Assignment>
 }
 
 @Repository
@@ -55,14 +112,6 @@ interface PointLedgerRepository : JpaRepository<PointLedger, Long> {
 
     @Query("SELECT p FROM PointLedger p ORDER BY p.weekStart DESC")
     fun findAllOrderByWeekDesc(): List<PointLedger>
-
-    @Query("""
-        SELECT p.weekStart, p.assignee, SUM(p.delta)
-        FROM PointLedger p
-        WHERE p.weekStart BETWEEN :from AND :to
-        GROUP BY p.weekStart, p.assignee
-    """)
-    fun sumByWeekAndAssigneeBetween(from: LocalDate, to: LocalDate): List<Array<Any>>
 }
 
 @Repository

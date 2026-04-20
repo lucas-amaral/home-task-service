@@ -11,5 +11,13 @@ healthcheckPath = "/api/health"
 healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
 
-# SPRING_PROFILES_ACTIVE=prod must also be set as an environment variable
-# in the Railway dashboard — see DEPLOY.md
+# Required environment variables (set in Railway dashboard):
+#
+#   SPRING_PROFILES_ACTIVE = prod
+#   DATABASE_URL           = ${{Postgres.DATABASE_URL}}    ← set automatically by plugin
+#   FRONTEND_URL           = https://your-app.vercel.app
+#   TZ                     = America/Sao_Paulo             ← for cron timezone
+#
+# Optional overrides:
+#   CHILD1_NAME            = Clara
+#   CHILD2_NAME            = Bernardo

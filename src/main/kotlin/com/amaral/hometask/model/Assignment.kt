@@ -45,7 +45,13 @@ data class Assignment(
 
     val completedAt: LocalDateTime? = null,
     val bonusEarned: Boolean = false,
-    val penaltyApplied: Boolean = false
+    val penaltyApplied: Boolean = false,
+
+    /**
+     * Soft-deleted when a missed-deadline penalty is recorded by the
+     * scheduled job; the row is kept for audit purposes.
+     */
+    val missedDeadline: Boolean = false
 ) {
     /** Convenience: the date to display on the post-it */
     val displayDate: LocalDate get() = periodDate ?: periodWeek!!

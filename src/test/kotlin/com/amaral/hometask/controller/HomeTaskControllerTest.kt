@@ -1,25 +1,15 @@
 package com.amaral.hometask.controller
 
-import com.amaral.hometask.model.AssignRequest
-import com.amaral.hometask.model.Assignee
-import com.amaral.hometask.model.AssignmentDto
-import com.amaral.hometask.model.BoardDto
-import com.amaral.hometask.model.CompleteRequest
-import com.amaral.hometask.model.FamilyConfigDto
-import com.amaral.hometask.model.RewardDto
-import com.amaral.hometask.model.TaskDto
-import com.amaral.hometask.model.TaskFrequency
-import com.amaral.hometask.model.TaskType
-import com.amaral.hometask.model.UpdateFamilyConfigRequest
+import com.amaral.hometask.model.*
 import com.amaral.hometask.service.HomeTaskService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
-import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
@@ -33,7 +23,7 @@ class HomeTaskControllerTest {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var mapper: ObjectMapper
-    @MockitoBean lateinit var service: HomeTaskService
+    @MockBean  lateinit var service: HomeTaskService
 
     private val today = LocalDate.of(2024, 1, 15)
     private val week  = LocalDate.of(2024, 1, 15)

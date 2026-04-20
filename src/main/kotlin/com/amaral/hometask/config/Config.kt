@@ -53,15 +53,22 @@ class DataSeeder(
     private fun buildTasks() = listOf(
         // ── Daily / Rule ────────────────────────────────────────────────────
         Task(
-            name = "Verificar banheiro",
+            name = "Verificar banheiro — $child1Name",
             description = "Tirar roupas íntimas molhadas, toalhas e roupas do banheiro",
             type = TaskType.RULE, frequency = TaskFrequency.DAILY,
-            defaultAssignee = Assignee.UNASSIGNED,
+            defaultAssignee = Assignee.CHILD1,
+            points = 1, timeWindow = "06:30 – 07:30", deadline = "até 07:30", sortOrder = 1
+        ),
+        Task(
+            name = "Verificar banheiro — $child2Name",
+            description = "Tirar roupas íntimas molhadas, toalhas e roupas do banheiro",
+            type = TaskType.RULE, frequency = TaskFrequency.DAILY,
+            defaultAssignee = Assignee.CHILD2,
             points = 1, timeWindow = "06:30 – 07:30", deadline = "até 07:30", sortOrder = 1
         ),
         Task(
             name = "Tirar mesa do café da manhã",
-            description = "Tirar a mesa e colocar a louça na máquina",
+            description = "Juntos: Tirar a mesa e colocar a louça na máquina",
             type = TaskType.DAILY, frequency = TaskFrequency.DAILY,
             defaultAssignee = Assignee.BOTH,
             points = 1, deadline = "manhã", sortOrder = 2
@@ -69,7 +76,7 @@ class DataSeeder(
         Task(
             name = "Tirar mesa do almoço",
             description = "Juntos: tirar a mesa e ligar/programar a máquina de lavar louça",
-            type = TaskType.JOINT, frequency = TaskFrequency.DAILY,
+            type = TaskType.DAILY, frequency = TaskFrequency.DAILY,
             defaultAssignee = Assignee.BOTH,
             points = 1, deadline = "até 13:05", sortOrder = 3
         ),
@@ -81,16 +88,23 @@ class DataSeeder(
             points = 1, deadline = "qualquer horário", sortOrder = 4
         ),
         Task(
-            name = "Itens pessoais fora da sala",
+            name = "Itens pessoais fora da sala  — $child1Name",
             description = "Tênis, meias, pijama e mochila não podem ficar na sala",
-            type = TaskType.RULE, frequency = TaskFrequency.DAILY,
-            defaultAssignee = Assignee.UNASSIGNED,
+            type = TaskType.DAILY, frequency = TaskFrequency.DAILY,
+            defaultAssignee = Assignee.CHILD1,
+            points = 1, deadline = "até 19:30", sortOrder = 5
+        ),
+        Task(
+            name = "Itens pessoais fora da sala  — $child2Name",
+            description = "Tênis, meias, pijama e mochila não podem ficar na sala",
+            type = TaskType.DAILY, frequency = TaskFrequency.DAILY,
+            defaultAssignee = Assignee.CHILD2,
             points = 1, deadline = "até 19:30", sortOrder = 5
         ),
         Task(
             name = "Colocar/Tirar mesa do jantar e programar máquina de louça",
-            description = "Juntos: tirar a mesa e ligar/programar a máquina de lavar louça",
-            type = TaskType.JOINT, frequency = TaskFrequency.DAILY,
+            description = "Tirar a mesa e ligar/programar a máquina de lavar louça",
+            type = TaskType.DAILY, frequency = TaskFrequency.DAILY,
             defaultAssignee = Assignee.UNASSIGNED,
             points = 1, deadline = "até 30 min após o jantar", sortOrder = 6
         ),

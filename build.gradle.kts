@@ -13,6 +13,10 @@ plugins {
 group = "com.amaral.home"
 version = "0.0.1-SNAPSHOT"
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+}
+
 repositories {
     mavenCentral()
 }
@@ -25,8 +29,11 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.postgresql:postgresql")
     implementation("com.h2database:h2")
+    implementation("com.zaxxer:HikariCP")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.mockito.kotlin:mockito-kotlin:6.1.0")
+    testImplementation("com.h2database:h2")
 }
 
 tasks.withType<KotlinJvmCompile> {

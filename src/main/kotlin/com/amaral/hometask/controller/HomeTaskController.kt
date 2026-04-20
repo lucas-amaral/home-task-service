@@ -1,10 +1,6 @@
 package com.amaral.hometask.controller
 
-import com.amaral.hometask.model.AssignRequest
-import com.amaral.hometask.model.AssignmentDto
-import com.amaral.hometask.model.CompleteRequest
-import com.amaral.hometask.model.CreateTaskRequest
-import com.amaral.hometask.model.UpdateFamilyConfigRequest
+import com.amaral.hometask.model.*
 import com.amaral.hometask.service.HomeTaskService
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.ResponseEntity
@@ -18,7 +14,7 @@ class HomeTaskController(private val service: HomeTaskService) {
     @GetMapping("/health")
     fun health() = mapOf("status" to "ok", "today" to service.today(), "weekStart" to service.weekStart())
 
-    // ── Family config ────────────────────────────────────────────────────────
+    // ── Family config ─────────────────────────────────────────────────────────
 
     @GetMapping("/config")
     fun getConfig() = service.getFamilyConfig()
@@ -26,7 +22,7 @@ class HomeTaskController(private val service: HomeTaskService) {
     @PutMapping("/config")
     fun updateConfig(@RequestBody req: UpdateFamilyConfigRequest) = service.updateFamilyConfig(req)
 
-    // ── Tasks ────────────────────────────────────────────────────────────────
+    // ── Tasks ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/tasks")
     fun listTasks() = service.listTasks()
@@ -34,7 +30,7 @@ class HomeTaskController(private val service: HomeTaskService) {
     @PostMapping("/tasks")
     fun createTask(@RequestBody req: CreateTaskRequest) = service.createTask(req)
 
-    // ── Board ────────────────────────────────────────────────────────────────
+    // ── Board ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/board")
     fun getBoard(
@@ -43,14 +39,14 @@ class HomeTaskController(private val service: HomeTaskService) {
         date: LocalDate?
     ) = service.getBoard(date ?: service.today())
 
-    // ── Week summary ─────────────────────────────────────────────────────────
+    // ── Week summary ──────────────────────────────────────────────────────────
 
     @GetMapping("/weeks/{weekStart}")
     fun getWeekSummary(
         @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) weekStart: LocalDate
     ) = service.getWeekSummary(weekStart)
 
-    // ── Assignments ──────────────────────────────────────────────────────────
+    // ── Assignments ───────────────────────────────────────────────────────────
 
     @PostMapping("/assignments/assign")
     fun assign(@RequestBody req: AssignRequest): ResponseEntity<AssignmentDto> =
@@ -71,13 +67,33 @@ class HomeTaskController(private val service: HomeTaskService) {
     fun penalty(@PathVariable id: Long): ResponseEntity<AssignmentDto> =
         ResponseEntity.ok(service.applyPenalty(id))
 
-    // ── Points history ───────────────────────────────────────────────────────
+    // ── Points history ────────────────────────────────────────────────────────
 
     @GetMapping("/points/history")
     fun pointsHistory() = service.getPointsHistory()
 
-    // ── Rewards ──────────────────────────────────────────────────────────────
+    // ── Rewards ───────────────────────────────────────────────────────────────
 
     @GetMapping("/rewards")
     fun rewards() = service.listRewards()
+
+    // ── Admin / maintenance ───────────────────────────────────────────────────
+
+    /**
+     * Manually triggers the end-of-day deadline penalty check.
+     * Use this for local testing without waiting for the 23:30 cron.
+     * Optionally pass ?date=YYYY-MM-DD to simulate a specific day.
+     *
+     * Example: POST /api/admin/run-deadline-check?date=2024-01-15
+     */
+    @PostMapping("/admin/run-deadline-check")
+    fun runDeadlineCheck(
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        date: LocalDate?
+    ): Map<String, Any> {
+        val target = date ?: service.today()
+        val count  = service.applyMissedDeadlinePenalties(target)
+        return mapOf("date" to target, "penaltiesApplied" to count)
+    }
 }
