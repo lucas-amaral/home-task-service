@@ -2,6 +2,9 @@
 builder = "NIXPACKS"
 buildCommand = "./gradlew bootJar"
 
+[variables]
+NIXPACKS_JDK_VERSION = "17"
+
 [deploy]
 startCommand = "java -Dspring.profiles.active=prod -jar build/libs/home-task-service.jar"
 healthcheckPath = "/api/health"
