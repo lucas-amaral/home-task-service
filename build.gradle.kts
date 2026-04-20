@@ -14,12 +14,12 @@ version = "0.0.1-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(26)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
 kotlin {
-    jvmToolchain(26)
+    jvmToolchain(21)
 }
 
 repositories {
@@ -41,12 +41,12 @@ dependencies {
 tasks.withType<KotlinJvmCompile> {
     compilerOptions {
         freeCompilerArgs.add("-Xjsr305=strict")
-        jvmTarget.set(JvmTarget.fromTarget("25"))
+        jvmTarget.set(JvmTarget.fromTarget("21"))
     }
 }
 
 tasks.withType<JavaCompile> {
-    options.release.set(25)
+    options.release.set(21)
 }
 
 tasks.withType<Test> {
