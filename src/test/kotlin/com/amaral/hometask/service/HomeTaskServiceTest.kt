@@ -21,7 +21,7 @@ class HomeTaskServiceTest {
 
     private val service = HomeTaskService(taskRepo, assignmentRepo, ledgerRepo, rewardRepo, familyConfigRepo)
 
-    private val monday = LocalDate.of(2024, 1, 15)    // a Monday
+    private val monday  = LocalDate.of(2024, 1, 15)  // a Monday
     private val tuesday = monday.plusDays(1)
 
     private fun makeTask(
@@ -58,9 +58,9 @@ class HomeTaskServiceTest {
 
     @Test
     fun `weekStart returns Monday for any day of the week`() {
-        assertEquals(monday, service.weekStart(monday))
-        assertEquals(monday, service.weekStart(tuesday))
-        assertEquals(monday, service.weekStart(monday.plusDays(6)))
+        assertEquals(monday,  service.weekStart(monday))
+        assertEquals(monday,  service.weekStart(tuesday))
+        assertEquals(monday,  service.weekStart(monday.plusDays(6)))
     }
 
     // ── getFamilyConfig ────────────────────────────────────────────────────
@@ -101,29 +101,32 @@ class HomeTaskServiceTest {
     @Test
     fun `getBoard creates daily assignments for today`() {
         val dailyTask = makeTask(id = 1L, frequency = TaskFrequency.DAILY)
-        whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(makeTask(id = 1L, frequency = TaskFrequency.DAILY)))
-        whenever(assignmentRepo.findByTaskIdAndPeriodDate(1L, monday)).thenReturn(null)
+        whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(dailyTask))
+        // upsertDaily é void — não precisa de mock explícito
         val created = makeAssignment(task = dailyTask, periodDate = monday)
-        whenever(assignmentRepo.save(any<Assignment>())).thenReturn(created)
+        whenever(assignmentRepo.findAllByTaskIdAndPeriodDate(1L, monday)).thenReturn(listOf(created))
 
         val board = service.getBoard(monday)
 
         assertEquals(monday, board.date)
         assertEquals(1, board.assignments.size)
-        assertEquals(monday, board.assignments[0].periodDate)
         assertEquals(dailyTask.id, board.assignments[0].taskId)
-        verify(assignmentRepo).save(any())
+        verify(assignmentRepo).upsertDaily(eq(1L), any(), eq(monday))
+        verify(assignmentRepo).findAllByTaskIdAndPeriodDate(1L, monday)
     }
 
     @Test
     fun `getBoard reuses existing daily assignment`() {
         val dailyTask = makeTask(id = 1L, frequency = TaskFrequency.DAILY)
-        whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(makeTask(id = 1L, frequency = TaskFrequency.DAILY)))
-        whenever(assignmentRepo.findByTaskIdAndPeriodDate(1L, monday)).thenReturn(makeAssignment(task = makeTask(id = 1L), periodDate = monday))
+        whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(dailyTask))
+        val existing = makeAssignment(task = dailyTask, periodDate = monday)
+        whenever(assignmentRepo.findAllByTaskIdAndPeriodDate(1L, monday)).thenReturn(listOf(existing))
 
         val board = service.getBoard(monday)
 
+        assertEquals(1, board.assignments.size)
         assertEquals(dailyTask.id, board.assignments[0].taskId)
+        // upsert ainda é chamado (é idempotente), mas save NÃO deve ser chamado
         verify(assignmentRepo, never()).save(any())
     }
 
@@ -131,17 +134,16 @@ class HomeTaskServiceTest {
     fun `getBoard creates weekly assignment using weekStart`() {
         val weeklyTask = makeTask(id = 2L, type = TaskType.WEEKLY, frequency = TaskFrequency.WEEKLY)
         whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(weeklyTask))
-        whenever(assignmentRepo.findByTaskIdAndPeriodDate(2L, monday)).thenReturn(null)
         val created = makeAssignment(task = weeklyTask, periodDate = null, periodWeek = monday)
-        whenever(assignmentRepo.save(any<Assignment>())).thenReturn(created)
+        whenever(assignmentRepo.findAllByTaskIdAndPeriodWeek(2L, monday)).thenReturn(listOf(created))
 
-        // Even if board is fetched on Tuesday, weekly task uses Monday
+        // Mesmo buscando em terça, a semana começa na segunda
         val board = service.getBoard(tuesday)
 
-        verify(assignmentRepo).findByTaskIdAndPeriodDate(2L, monday)
+        verify(assignmentRepo).upsertWeekly(eq(2L), any(), eq(monday))
+        verify(assignmentRepo).findAllByTaskIdAndPeriodWeek(2L, monday)
         assertEquals(1, board.assignments.size)
         assertEquals(weeklyTask.id, board.assignments[0].taskId)
-        verify(assignmentRepo).save(any())
     }
 
     // ── assignTask ─────────────────────────────────────────────────────────
@@ -149,9 +151,9 @@ class HomeTaskServiceTest {
     @Test
     fun `assignTask creates new assignment when none exists`() {
         val task = makeTask(id = 1L)
-        val req = AssignRequest(taskId = 1L, assignedTo = Assignee.CHILD1, date = monday)
+        val req  = AssignRequest(taskId = 1L, assignedTo = Assignee.CHILD1, date = monday)
         whenever(taskRepo.findById(1L)).thenReturn(Optional.of(task))
-        whenever(assignmentRepo.findByTaskIdAndPeriodDate(1L, monday)).thenReturn(null)
+        whenever(assignmentRepo.findAllByTaskIdAndPeriodDate(1L, monday)).thenReturn(emptyList())
         val saved = makeAssignment(assignedTo = Assignee.CHILD1)
         whenever(assignmentRepo.save(any<Assignment>())).thenReturn(saved)
 
@@ -180,7 +182,7 @@ class HomeTaskServiceTest {
 
     @Test
     fun `completeAssignment awards points and sets completedAt`() {
-        val task = makeTask(points = 2)
+        val task       = makeTask(points = 2)
         val assignment = makeAssignment(task = task, assignedTo = Assignee.CHILD1)
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
@@ -193,7 +195,7 @@ class HomeTaskServiceTest {
 
     @Test
     fun `completeAssignment awards bonus point when bonusEarned=true`() {
-        val task = makeTask(points = 1)
+        val task       = makeTask(points = 1)
         val assignment = makeAssignment(task = task, assignedTo = Assignee.CHILD2)
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
@@ -206,7 +208,7 @@ class HomeTaskServiceTest {
 
     @Test
     fun `completeAssignment awards points to both children for BOTH assignee`() {
-        val task = makeTask(points = 1)
+        val task       = makeTask(points = 1)
         val assignment = makeAssignment(task = task, assignedTo = Assignee.BOTH)
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
@@ -229,7 +231,7 @@ class HomeTaskServiceTest {
 
     @Test
     fun `uncompleteAssignment reverses points`() {
-        val task = makeTask(points = 3)
+        val task       = makeTask(points = 3)
         val assignment = makeAssignment(task = task, assignedTo = Assignee.CHILD1,
                                         completedAt = LocalDateTime.now(), bonusEarned = true)
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
@@ -238,7 +240,7 @@ class HomeTaskServiceTest {
 
         service.uncompleteAssignment(10L)
 
-        // 3 pts + 1 bonus = 4 reversed
+        // 3 pts + 1 bonus = 4 revertidos
         verify(ledgerRepo).save(argThat { delta == -4 && assignee == Assignee.CHILD1 })
     }
 
@@ -246,7 +248,7 @@ class HomeTaskServiceTest {
 
     @Test
     fun `applyPenalty deducts 1 point from correct child`() {
-        val task = makeTask()
+        val task       = makeTask()
         val assignment = makeAssignment(task = task, assignedTo = Assignee.CHILD2)
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
