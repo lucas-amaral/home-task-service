@@ -1,0 +1,4 @@
+.env.properties
+.gradle/
+build/
+.idea/
