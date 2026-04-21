@@ -32,7 +32,7 @@ class HomeTaskServiceTest {
         defaultAssignee: Assignee = Assignee.UNASSIGNED,
         points: Int = 1
     ) = Task(id = id, name = name, type = type, frequency = frequency,
-        defaultAssignee = defaultAssignee, points = points)
+             defaultAssignee = defaultAssignee, points = points)
 
     private fun makeAssignment(
         id: Long = 10L,
@@ -43,8 +43,8 @@ class HomeTaskServiceTest {
         completedAt: LocalDateTime? = null,
         bonusEarned: Boolean = false
     ) = Assignment(id = id, task = task, assignedTo = assignedTo,
-        periodDate = periodDate, periodWeek = periodWeek,
-        completedAt = completedAt, bonusEarned = bonusEarned)
+                   periodDate = periodDate, periodWeek = periodWeek,
+                   completedAt = completedAt, bonusEarned = bonusEarned)
 
     @BeforeEach
     fun setup() {
@@ -233,7 +233,7 @@ class HomeTaskServiceTest {
     fun `uncompleteAssignment reverses points`() {
         val task       = makeTask(points = 3)
         val assignment = makeAssignment(task = task, assignedTo = Assignee.CHILD1,
-            completedAt = LocalDateTime.now(), bonusEarned = true)
+                                        completedAt = LocalDateTime.now(), bonusEarned = true)
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
         whenever(ledgerRepo.save(any<PointLedger>())).thenAnswer { it.arguments[0] }
