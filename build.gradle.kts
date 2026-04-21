@@ -28,12 +28,10 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.postgresql:postgresql")
-    implementation("com.h2database:h2")
-    implementation("com.zaxxer:HikariCP")
 
+    testImplementation("com.h2database:h2")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.mockito.kotlin:mockito-kotlin:6.1.0")
-    testImplementation("com.h2database:h2")
 }
 
 tasks.withType<KotlinJvmCompile> {
