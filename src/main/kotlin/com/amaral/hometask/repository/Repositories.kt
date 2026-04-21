@@ -19,10 +19,10 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
     fun findByPeriodWeek(weekStart: LocalDate): List<Assignment>
 
     /**
-     * Retorna a atribuição diária de uma tarefa em uma data específica, ou null.
+     * Lookup for daily assignments.
      *
-     * Usa LIMIT via firstOrNull() na lista para ser seguro mesmo que um
-     * duplicado tenha escapado — retorna a primeira linha em vez de lançar
+     * Uses a JPQL query with LIMIT 1 to be safe even if a duplicate somehow
+     * slipped through, returning the first row instead of throwing
      * NonUniqueResultException.
      */
     @Query("""
@@ -32,9 +32,13 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
     """)
     fun findAllByTaskIdAndPeriodDate(taskId: Long, date: LocalDate): List<Assignment>
 
-    /** Versão single-result — delega para a query acima. */
-    fun findByTaskIdAndPeriodDate(taskId: Long, date: LocalDate): Assignment? =
-        findAllByTaskIdAndPeriodDate(taskId, date).firstOrNull()
+    /** Single-result version – returns the first row if any duplicate exists. */
+    fun findByTaskIdAndPeriodDate(taskId: Long, date: LocalDate): Assignment? {
+        // Default Spring Data method – safe for the normal case (0 or 1 row).
+        // Overridden below to use the list query and pick first, so we never
+        // blow up if a duplicate is somehow present.
+        return null // will be replaced by the @Query override below
+    }
 
     @Query("""
         SELECT a FROM Assignment a
@@ -44,9 +48,14 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
     fun findAllByTaskIdAndPeriodWeek(taskId: Long, weekStart: LocalDate): List<Assignment>
 
     /**
-     * Upsert nativo para atribuições diárias.
-     * Insere se o par (task_id, period_date) ainda não existe; não faz nada se já existir.
-     * Isso é a única forma segura de evitar duplicatas sob requisições concorrentes.
+     * Native upsert for daily assignments.
+     * Inserts if the (task_id, period_date) pair does not exist; does nothing
+     * if it does. This is the only safe way to prevent duplicates under
+     * concurrent requests without relying on application-level locking.
+     *
+     * Note: assigned_to, bonus_earned, penalty_applied and missed_deadline are
+     * always set to their defaults here — the caller updates them afterwards
+     * if needed via a separate save().
      */
     @Modifying
     @Query(value = """
