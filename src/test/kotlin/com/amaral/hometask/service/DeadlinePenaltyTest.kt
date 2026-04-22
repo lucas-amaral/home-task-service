@@ -7,19 +7,15 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import java.time.LocalDate
-import java.util.*
 
 class DeadlinePenaltyTest {
 
-    private val taskRepo: TaskRepository = mock()
     private val assignmentRepo: AssignmentRepository = mock()
     private val ledgerRepo: PointLedgerRepository = mock()
-    private val rewardRepo: RewardRepository = mock()
-    private val familyConfigRepo: FamilyConfigRepository = mock()
+    private val taskRepo: TaskRepository = mock()
+    private val familyConfigService: FamilyConfigService = mock()
 
-    private val service = HomeTaskService(
-        taskRepo, assignmentRepo, ledgerRepo, rewardRepo, familyConfigRepo
-    )
+    private val service = AssignmentService(assignmentRepo, taskRepo, ledgerRepo, familyConfigService)
 
     // A Monday
     private val monday = LocalDate.of(2024, 1, 15)
@@ -40,9 +36,6 @@ class DeadlinePenaltyTest {
 
     @BeforeEach
     fun setup() {
-        whenever(familyConfigRepo.findById(1L))
-            .thenReturn(Optional.of(FamilyConfig(child1Name = "C1", child2Name = "C2")))
-        whenever(ledgerRepo.findByWeekStart(any())).thenReturn(emptyList())
         whenever(ledgerRepo.save(any<PointLedger>())).thenAnswer { it.arguments[0] }
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
     }
@@ -84,7 +77,6 @@ class DeadlinePenaltyTest {
 
     @Test
     fun `UNASSIGNED assignment is never penalised`() {
-        val a = makeAssignment(assignedTo = Assignee.UNASSIGNED)
         // findMissedCandidates already filters out UNASSIGNED at the DB level,
         // but even if one slips through the service resolvePersons returns empty
         whenever(assignmentRepo.findMissedCandidates(tuesday, monday)).thenReturn(emptyList())

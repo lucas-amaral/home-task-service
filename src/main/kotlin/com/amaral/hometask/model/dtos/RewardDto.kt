@@ -1,4 +1,4 @@
-package com.amaral.hometask.model
+package com.amaral.hometask.model.dtos
 
 data class RewardDto(
     val id: Long,

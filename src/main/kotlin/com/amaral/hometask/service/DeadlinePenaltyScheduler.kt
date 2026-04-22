@@ -4,7 +4,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.LocalDate
-import java.time.LocalTime
 
 /**
  * Runs once per day, just after midnight, to apply −1 point penalties for
@@ -21,13 +20,13 @@ import java.time.LocalTime
  * then fire at 00:01 in that timezone.
  */
 @Component
-class DeadlinePenaltyScheduler(private val service: HomeTaskService) {
+class DeadlinePenaltyScheduler(private val service: AssignmentService) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     @Scheduled(cron = "\${scheduler.penalty-cron:0 1 0 * * *}", zone = "\${scheduler.timezone:UTC}")
     fun applyDailyPenalties() {
-        // We penalise for *yesterday* – the day that just ended
+        // We penalize for *yesterday* – the day that just ended
         val yesterday = LocalDate.now().minusDays(1)
         log.info("Running end-of-day penalty check for {}", yesterday)
 

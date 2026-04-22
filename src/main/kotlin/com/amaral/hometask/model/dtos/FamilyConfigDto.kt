@@ -1,4 +1,4 @@
-package com.amaral.hometask.model
+package com.amaral.hometask.model.dtos
 
 data class FamilyConfigDto(
     val child1Name: String,

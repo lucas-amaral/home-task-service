@@ -1,4 +1,8 @@
-package com.amaral.hometask.model
+package com.amaral.hometask.model.dtos
+
+import com.amaral.hometask.model.Assignee
+import com.amaral.hometask.model.TaskFrequency
+import com.amaral.hometask.model.TaskType
 
 data class TaskDto(
     val id: Long,

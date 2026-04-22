@@ -1,6 +1,5 @@
 package com.amaral.hometask.model.dtos
 
-import com.amaral.hometask.model.AssignmentDto
 import java.time.LocalDate
 
 data class BoardDto(

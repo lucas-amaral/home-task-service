@@ -1,5 +1,8 @@
-package com.amaral.hometask.model
+package com.amaral.hometask.model.dtos
 
+import com.amaral.hometask.model.Assignee
+import com.amaral.hometask.model.TaskFrequency
+import com.amaral.hometask.model.TaskType
 import java.time.LocalDate
 import java.time.LocalDateTime
 

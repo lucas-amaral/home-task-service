@@ -7,18 +7,15 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import java.time.LocalDate
-import java.time.LocalDateTime
-import java.util.Optional
 
 class DeadlinePenaltySchedulerTest {
 
-    private val taskRepo: TaskRepository = mock()
     private val assignmentRepo: AssignmentRepository = mock()
     private val ledgerRepo: PointLedgerRepository = mock()
-    private val rewardRepo: RewardRepository = mock()
-    private val familyConfigRepo: FamilyConfigRepository = mock()
+    private val taskRepo: TaskRepository = mock()
+    private val familyConfigService: FamilyConfigService = mock()
 
-    private val service = HomeTaskService(taskRepo, assignmentRepo, ledgerRepo, rewardRepo, familyConfigRepo)
+    private val service = AssignmentService(assignmentRepo, taskRepo, ledgerRepo, familyConfigService)
 
     private val monday  = LocalDate.of(2024, 1, 15)
     private val tuesday = monday.plusDays(1)
@@ -30,8 +27,6 @@ class DeadlinePenaltySchedulerTest {
 
     @BeforeEach
     fun setup() {
-        whenever(familyConfigRepo.findById(1L))
-            .thenReturn(Optional.of(FamilyConfig(child1Name = "C1", child2Name = "C2")))
         whenever(ledgerRepo.save(any<PointLedger>())).thenAnswer { it.arguments[0] }
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
     }
