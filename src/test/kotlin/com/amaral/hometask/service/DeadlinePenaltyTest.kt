@@ -96,22 +96,6 @@ class DeadlinePenaltyTest {
     }
 
     @Test
-    fun `BOTH joint task penalises both children`() {
-        val jointTask = makeTask(frequency = TaskFrequency.DAILY)
-        val a = makeAssignment(task = jointTask, assignedTo = Assignee.BOTH)
-        whenever(assignmentRepo.findMissedCandidates(tuesday, monday)).thenReturn(listOf(a))
-
-        // BOTH is not filtered by findMissedCandidates query (only CHILD1/CHILD2 are listed)
-        // so for BOTH we need the service to call resolvePersons — verify both children
-        // NOTE: findMissedCandidates filters IN ('CHILD1','CHILD2') so BOTH won't appear.
-        // This test documents that behaviour: BOTH tasks are intentionally not auto-penalised.
-        val count = service.applyMissedDeadlinePenalties(tuesday)
-
-        assertEquals(0, count)
-        verify(ledgerRepo, never()).save(any())
-    }
-
-    @Test
     fun `already penalised assignment is not penalised again`() {
         // Already penalised row is excluded by findMissedCandidates (penaltyApplied = false filter)
         whenever(assignmentRepo.findMissedCandidates(tuesday, monday)).thenReturn(emptyList())

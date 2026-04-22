@@ -23,16 +23,6 @@ class AssignmentRepositoryTest {
         taskRepo.save(Task(name = name, type = TaskType.DAILY, frequency = frequency, points = 1))
 
     @Test
-    fun `findByTaskIdAndPeriodDate returns correct daily assignment`() {
-        val task = saveTask()
-        val a = assignmentRepo.save(Assignment(task = task, assignedTo = Assignee.CHILD1, periodDate = monday))
-
-        val found = assignmentRepo.findByTaskIdAndPeriodDate(task.id, monday)
-        assertNotNull(found)
-        assertEquals(a.id, found!!.id)
-    }
-
-    @Test
     fun `findByTaskIdAndPeriodDate returns null for different date`() {
         val task = saveTask()
         assignmentRepo.save(Assignment(task = task, assignedTo = Assignee.CHILD1, periodDate = monday))

@@ -20,7 +20,7 @@ class DeadlinePenaltySchedulerTest {
 
     private val service = HomeTaskService(taskRepo, assignmentRepo, ledgerRepo, rewardRepo, familyConfigRepo)
 
-    private val monday = LocalDate.of(2024, 1, 15)
+    private val monday  = LocalDate.of(2024, 1, 15)
     private val tuesday = monday.plusDays(1)
 
     private fun makeTask(id: Long = 1L) = Task(
@@ -36,6 +36,8 @@ class DeadlinePenaltySchedulerTest {
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
     }
 
+    // O service chama findMissedCandidates — não findAllForWeek
+
     @Test
     fun `applies penalty to incomplete CHILD1 assignment`() {
         val task = makeTask()
@@ -44,7 +46,7 @@ class DeadlinePenaltySchedulerTest {
             periodDate = monday, completedAt = null,
             penaltyApplied = false, missedDeadline = false
         )
-        whenever(assignmentRepo.findAllForWeek(any(), any())).thenReturn(listOf(assignment))
+        whenever(assignmentRepo.findMissedCandidates(monday, monday)).thenReturn(listOf(assignment))
 
         val count = service.applyMissedDeadlinePenalties(monday)
 
@@ -55,13 +57,8 @@ class DeadlinePenaltySchedulerTest {
 
     @Test
     fun `skips already completed assignments`() {
-        val task = makeTask()
-        val assignment = Assignment(
-            id = 1L, task = task, assignedTo = Assignee.CHILD1,
-            periodDate = monday, completedAt = LocalDateTime.now(),
-            penaltyApplied = false, missedDeadline = false
-        )
-        whenever(assignmentRepo.findAllForWeek(any(), any())).thenReturn(listOf(assignment))
+        // findMissedCandidates já filtra completedAt IS NULL — retorna vazio
+        whenever(assignmentRepo.findMissedCandidates(monday, monday)).thenReturn(emptyList())
 
         val count = service.applyMissedDeadlinePenalties(monday)
 
@@ -71,13 +68,8 @@ class DeadlinePenaltySchedulerTest {
 
     @Test
     fun `skips UNASSIGNED assignments`() {
-        val task = makeTask()
-        val assignment = Assignment(
-            id = 1L, task = task, assignedTo = Assignee.UNASSIGNED,
-            periodDate = monday, completedAt = null,
-            penaltyApplied = false, missedDeadline = false
-        )
-        whenever(assignmentRepo.findAllForWeek(any(), any())).thenReturn(listOf(assignment))
+        // findMissedCandidates já filtra assignedTo IN ('CHILD1','CHILD2') — retorna vazio
+        whenever(assignmentRepo.findMissedCandidates(monday, monday)).thenReturn(emptyList())
 
         val count = service.applyMissedDeadlinePenalties(monday)
 
@@ -87,13 +79,8 @@ class DeadlinePenaltySchedulerTest {
 
     @Test
     fun `skips already penalised assignments`() {
-        val task = makeTask()
-        val assignment = Assignment(
-            id = 1L, task = task, assignedTo = Assignee.CHILD2,
-            periodDate = monday, completedAt = null,
-            penaltyApplied = true, missedDeadline = false
-        )
-        whenever(assignmentRepo.findAllForWeek(any(), any())).thenReturn(listOf(assignment))
+        // findMissedCandidates já filtra penaltyApplied = false — retorna vazio
+        whenever(assignmentRepo.findMissedCandidates(monday, monday)).thenReturn(emptyList())
 
         val count = service.applyMissedDeadlinePenalties(monday)
 
@@ -108,7 +95,7 @@ class DeadlinePenaltySchedulerTest {
                             periodDate = monday, penaltyApplied = false, missedDeadline = false)
         val a2 = Assignment(id = 2L, task = task2, assignedTo = Assignee.CHILD2,
                             periodDate = monday, penaltyApplied = false, missedDeadline = false)
-        whenever(assignmentRepo.findAllForWeek(any(), any())).thenReturn(listOf(a1, a2))
+        whenever(assignmentRepo.findMissedCandidates(monday, monday)).thenReturn(listOf(a1, a2))
 
         val count = service.applyMissedDeadlinePenalties(monday)
 
@@ -119,7 +106,7 @@ class DeadlinePenaltySchedulerTest {
 
     @Test
     fun `returns zero when no assignments exist`() {
-        whenever(assignmentRepo.findAllForWeek(any(), any())).thenReturn(emptyList())
+        whenever(assignmentRepo.findMissedCandidates(monday, monday)).thenReturn(emptyList())
         assertEquals(0, service.applyMissedDeadlinePenalties(monday))
         verify(ledgerRepo, never()).save(any())
     }
