@@ -1,16 +1,11 @@
 package com.amaral.hometask.repository
 
-import com.amaral.hometask.model.*
+import com.amaral.hometask.model.Assignment
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
 import java.time.LocalDate
-
-@Repository
-interface TaskRepository : JpaRepository<Task, Long> {
-    fun findByActiveTrueOrderBySortOrderAsc(): List<Task>
-}
 
 @Repository
 interface AssignmentRepository : JpaRepository<Assignment, Long> {
@@ -48,26 +43,23 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
     fun findAllByTaskIdAndPeriodWeek(taskId: Long, weekStart: LocalDate): List<Assignment>
 
     /**
-     * Native upsert for daily assignments.
-     * Inserts if the (task_id, period_date) pair does not exist; does nothing
-     * if it does. This is the only safe way to prevent duplicates under
-     * concurrent requests without relying on application-level locking.
+     * Portable idempotent insert for daily assignments.
      *
-     * Note: assigned_to, bonus_earned, penalty_applied and missed_deadline are
-     * always set to their defaults here — the caller updates them afterwards
-     * if needed via a separate save().
+     * PostgreSQL supports a more compact partial-index ON CONFLICT form here,
+     * but H2 does not parse that syntax. This variant works in both test and
+     * production environments and matches the weekly insert strategy below.
      */
     @Modifying
     @Query(value = """
         INSERT INTO assignments
             (task_id, assigned_to, period_date, period_week,
              completed_at, bonus_earned, penalty_applied, missed_deadline)
-        VALUES
-            (:taskId, :assignedTo, :periodDate, NULL,
-             NULL, false, false, false)
-        ON CONFLICT (task_id, period_date)
-            WHERE period_date IS NOT NULL
-        DO NOTHING
+        SELECT :taskId, :assignedTo, :periodDate, NULL,
+               NULL, false, false, false
+        WHERE NOT EXISTS (
+            SELECT 1 FROM assignments
+            WHERE task_id = :taskId AND period_date = :periodDate
+        )
     """, nativeQuery = true)
     fun upsertDaily(taskId: Long, assignedTo: String, periodDate: LocalDate)
 
@@ -76,12 +68,12 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
         INSERT INTO assignments
             (task_id, assigned_to, period_date, period_week,
              completed_at, bonus_earned, penalty_applied, missed_deadline)
-        VALUES
-            (:taskId, :assignedTo, NULL, :periodWeek,
-             NULL, false, false, false)
-        ON CONFLICT (task_id, period_week)
-            WHERE period_week IS NOT NULL
-        DO NOTHING
+        SELECT :taskId, :assignedTo, NULL, :periodWeek,
+               NULL, false, false, false
+        WHERE NOT EXISTS (
+            SELECT 1 FROM assignments 
+            WHERE task_id = :taskId AND period_week = :periodWeek
+        )
     """, nativeQuery = true)
     fun upsertWeekly(taskId: Long, assignedTo: String, periodWeek: LocalDate)
 
@@ -105,19 +97,3 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
     @Query("SELECT a FROM Assignment a ORDER BY a.completedAt DESC")
     fun findAllOrderByCompletedDesc(): List<Assignment>
 }
-
-@Repository
-interface PointLedgerRepository : JpaRepository<PointLedger, Long> {
-    fun findByWeekStart(weekStart: LocalDate): List<PointLedger>
-
-    @Query("SELECT p FROM PointLedger p ORDER BY p.weekStart DESC")
-    fun findAllOrderByWeekDesc(): List<PointLedger>
-}
-
-@Repository
-interface RewardRepository : JpaRepository<Reward, Long> {
-    fun findByActiveTrue(): List<Reward>
-}
-
-@Repository
-interface FamilyConfigRepository : JpaRepository<FamilyConfig, Long>

@@ -1,6 +1,7 @@
 package com.amaral.hometask.service
 
 import com.amaral.hometask.model.*
+import com.amaral.hometask.model.dtos.*
 import com.amaral.hometask.repository.*
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -269,8 +270,11 @@ class HomeTaskService(
     )
 
     private fun Assignment.toDto() = AssignmentDto(
-        id = id, taskId = task.id, taskName = task.name,
-        taskType = task.type, taskFrequency = task.frequency,
+        id = id, taskId = task.id,
+        taskName = task.name,
+        taskDescription = task.description,
+        taskType = task.type,
+        taskFrequency = task.frequency,
         assignedTo = assignedTo,
         periodDate = displayDate,
         completed = completedAt != null,

@@ -1,6 +1,7 @@
 package com.amaral.hometask.controller
 
 import com.amaral.hometask.model.*
+import com.amaral.hometask.model.dtos.*
 import com.amaral.hometask.service.HomeTaskService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
@@ -120,6 +121,7 @@ class HomeTaskControllerTest {
         val req = AssignRequest(taskId = 1L, assignedTo = Assignee.CHILD1, date = today)
         val dto = AssignmentDto(
             id = 10L, taskId = 1L, taskName = "Vacuum",
+            taskDescription = "Use the vacuum",
             taskType = TaskType.DAILY, taskFrequency = TaskFrequency.DAILY,
             assignedTo = Assignee.CHILD1, periodDate = today,
             completed = false, completedAt = null,
@@ -141,6 +143,7 @@ class HomeTaskControllerTest {
         val req = CompleteRequest(bonusEarned = true)
         val dto = AssignmentDto(
             id = 10L, taskId = 1L, taskName = "Vacuum",
+            taskDescription = "Use the vacuum",
             taskType = TaskType.DAILY, taskFrequency = TaskFrequency.DAILY,
             assignedTo = Assignee.CHILD1, periodDate = today,
             completed = true, completedAt = LocalDateTime.now(),

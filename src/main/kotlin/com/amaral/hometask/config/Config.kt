@@ -90,14 +90,14 @@ class DataSeeder(
         Task(
             name = "Itens pessoais fora da sala  — $child1Name",
             description = "Tênis, meias, pijama e mochila não podem ficar na sala",
-            type = TaskType.DAILY, frequency = TaskFrequency.DAILY,
+            type = TaskType.RULE, frequency = TaskFrequency.DAILY,
             defaultAssignee = Assignee.CHILD1,
             points = 1, deadline = "até 19:30", sortOrder = 5
         ),
         Task(
             name = "Itens pessoais fora da sala  — $child2Name",
             description = "Tênis, meias, pijama e mochila não podem ficar na sala",
-            type = TaskType.DAILY, frequency = TaskFrequency.DAILY,
+            type = TaskType.RULE, frequency = TaskFrequency.DAILY,
             defaultAssignee = Assignee.CHILD2,
             points = 1, deadline = "até 19:30", sortOrder = 5
         ),
@@ -131,12 +131,19 @@ class DataSeeder(
             defaultAssignee = Assignee.UNASSIGNED,
             points = 3, deadline = "durante a semana", sortOrder = 9
         ),
+        Task(
+            name = "Limpar aspirador de pó",
+            description = "Remover o lixo do compartimento e limpar a escova do aspirador",
+            type = TaskType.WEEKLY, frequency = TaskFrequency.WEEKLY,
+            defaultAssignee = Assignee.UNASSIGNED,
+            points = 1, deadline = "até 30 min após o jantar", sortOrder = 6
+        ),
     )
 
     private fun buildRewards() = listOf(
-        Reward(name = "Escolher o filme do fim de semana", pointsCost = 5,  emoji = "🎬"),
-        Reward(name = "Escolher o jantar",         pointsCost = 8,  emoji = "🍕"),
-        Reward(name = "1 hora extra de tela",              pointsCost = 10, emoji = "📱"),
-        Reward(name = "Recompensa especial (combinar com os pais)", pointsCost = 20, emoji = "⭐"),
+        Reward(name = "Escolher o filme/jogo do fim de semana", pointsCost = 15,  emoji = "🎬"),
+        Reward(name = "Escolher o jantar",         pointsCost = 22,  emoji = "🍕"),
+        Reward(name = "1 hora extra de tela/música",              pointsCost = 35, emoji = "📱"),
+        Reward(name = "Recompensa especial (combinar com os pais)", pointsCost = 50, emoji = "⭐"),
     )
 }

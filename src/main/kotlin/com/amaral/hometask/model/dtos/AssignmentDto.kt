@@ -7,6 +7,7 @@ data class AssignmentDto(
     val id: Long,
     val taskId: Long,
     val taskName: String,
+    var taskDescription : String,
     val taskType: TaskType,
     val taskFrequency: TaskFrequency,
     val assignedTo: Assignee,

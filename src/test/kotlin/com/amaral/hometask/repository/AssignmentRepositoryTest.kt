@@ -43,6 +43,18 @@ class AssignmentRepositoryTest {
     }
 
     @Test
+    fun `upsertDaily is idempotent under H2`() {
+        val task = saveTask()
+
+        assignmentRepo.upsertDaily(task.id, Assignee.CHILD1.name, monday)
+        assignmentRepo.upsertDaily(task.id, Assignee.CHILD1.name, monday)
+
+        val results = assignmentRepo.findAllByTaskIdAndPeriodDate(task.id, monday)
+        assertEquals(1, results.size)
+        assertEquals(Assignee.CHILD1, results.first().assignedTo)
+    }
+
+    @Test
     fun `point ledger aggregates correctly`() {
         ledgerRepo.save(PointLedger(assignee = Assignee.CHILD1, weekStart = monday, delta = 3))
         ledgerRepo.save(PointLedger(assignee = Assignee.CHILD1, weekStart = monday, delta = 1))
