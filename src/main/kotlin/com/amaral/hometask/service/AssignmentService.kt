@@ -18,7 +18,8 @@ class AssignmentService(
     private val assignmentRepo: AssignmentRepository,
     private val taskRepo: TaskRepository,
     private val ledgerRepo: PointLedgerRepository,
-    private val familyConfigService: FamilyConfigService
+    private val familyConfigService: FamilyConfigService,
+    private val whatsAppNotifier: WhatsAppNotifier
 ) {
 
     // ── Board operations ─────────────────────────────────────────────────────
@@ -104,6 +105,31 @@ class AssignmentService(
         return assignmentRepo.save(assignment.copy(penaltyApplied = false)).toDto()
     }
 
+    /**
+     * Deletes an assignment row entirely.
+     * If the assignment had already been completed, the earned points are reversed first.
+     * If a penalty was applied, the ledger deduction is also reversed.
+     */
+    @Transactional
+    fun deleteAssignment(id: Long) {
+        val assignment = findAssignment(id)
+
+        // Reverse points if completed
+        if (assignment.completedAt != null) {
+            reversePoints(assignment)
+        }
+
+        // Reverse penalty ledger entry if a manual penalty was applied
+        // (missed-deadline penalties are left as-is for audit purposes)
+        if (assignment.penaltyApplied && !assignment.missedDeadline) {
+            val week = weekStart(assignment.displayDate)
+            resolvePersons(assignment.assignedTo)
+                .forEach { addLedger(it, week, +1, "Penalty reversed (assignment deleted): ${assignment.task.name}") }
+        }
+
+        assignmentRepo.deleteById(id)
+    }
+
     // ── Missed deadline penalties ────────────────────────────────────────────
 
     @Transactional
@@ -119,13 +145,38 @@ class AssignmentService(
                 }
             }
 
+        val cfg = familyConfigService.getFamilyConfigEntity()
+
         candidates.forEach { a ->
             assignmentRepo.save(a.copy(missedDeadline = true, penaltyApplied = true))
             resolvePersons(a.assignedTo)
                 .forEach { person -> addLedger(person, week, -1, "Missed deadline: ${a.task.name}") }
+
+            // Send WhatsApp notifications if the task has a deadlineDate and it has passed
+            if (a.task.deadlineDate != null && a.task.deadlineDate <= LocalDateTime.now()) {
+                sendDeadlineNotification(a, cfg)
+            }
         }
 
         return candidates.size
+    }
+
+    private fun sendDeadlineNotification(assignment: Assignment, cfg: FamilyConfig) {
+        val taskName = assignment.task.name
+        val message  = "⚠️ Tarefa não concluída: \"$taskName\" estava com prazo para hoje. Foi aplicada uma penalidade de -1 ponto."
+
+        fun phoneFor(assignee: Assignee): String = when (assignee) {
+            Assignee.CHILD1 -> cfg.child1Phone
+            Assignee.CHILD2 -> cfg.child2Phone
+            else            -> ""
+        }
+
+        resolvePersons(assignment.assignedTo).forEach { person ->
+            val phone = phoneFor(person)
+            if (phone.isNotBlank()) {
+                whatsAppNotifier.send(phone, message)
+            }
+        }
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
@@ -162,20 +213,20 @@ class AssignmentService(
 
     // ── Mappers ──────────────────────────────────────────────────────────────
 
-    private fun Assignment.toDto() = AssignmentDto(
-        id = id,
-        taskId = task.id,
-        taskName = task.name,
+    fun Assignment.toDto() = AssignmentDto(
+        id              = id,
+        taskId          = task.id,
+        taskName        = task.name,
         taskDescription = task.description,
-        taskType = task.type,
-        taskFrequency = task.frequency,
-        assignedTo = assignedTo,
-        periodDate = displayDate,
-        completed = completedAt != null,
-        completedAt = completedAt,
-        bonusEarned = bonusEarned,
-        penaltyApplied = penaltyApplied,
-        points = task.points
+        taskType        = task.type,
+        taskFrequency   = task.frequency,
+        assignedTo      = assignedTo,
+        periodDate      = displayDate,
+        completed       = completedAt != null,
+        completedAt     = completedAt,
+        bonusEarned     = bonusEarned,
+        penaltyApplied  = penaltyApplied,
+        points          = task.points,
+        deadlineDate    = task.deadlineDate
     )
 }
-

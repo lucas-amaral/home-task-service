@@ -1,6 +1,6 @@
 package com.amaral.hometask.service
 
-import com.amaral.hometask.model.CreateTaskRequest
+import com.amaral.hometask.model.requests.CreateTaskRequest
 import com.amaral.hometask.model.Task
 import com.amaral.hometask.model.TaskFrequency
 import com.amaral.hometask.model.TaskType

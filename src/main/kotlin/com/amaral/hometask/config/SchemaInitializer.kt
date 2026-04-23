@@ -8,13 +8,11 @@ import org.springframework.context.annotation.Bean
 import javax.sql.DataSource
 
 /**
- * Applies the partial unique indexes defined in schema-postgres.sql on startup.
+ * Applies schema changes that Hibernate's ddl-auto=update cannot handle:
+ *  - Partial unique indexes (ON CONFLICT clauses for upsert operations)
+ *  - ADD COLUMN IF NOT EXISTS for new fields introduced after initial deployment
  *
- * Spring Boot's ddl-auto=update creates columns and tables but does NOT
- * create custom indexes. We run the SQL manually here so the ON CONFLICT
- * clauses in AssignmentRepository always have a valid index to reference.
- *
- * The SQL uses IF NOT EXISTS so it is safe to run on every startup.
+ * All statements are idempotent — safe to run on every startup.
  */
 @Configuration
 @Profile("prod")
@@ -23,26 +21,36 @@ class SchemaInitializer(private val dataSource: DataSource) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     @Bean
-    fun applyPartialIndexes() = ApplicationRunner {
-        val sql = listOf(
+    fun applySchemaChanges() = ApplicationRunner {
+        val migrations = listOf(
+            // ── Partial unique indexes ────────────────────────────────────────
             """CREATE UNIQUE INDEX IF NOT EXISTS uq_assignment_daily
                ON assignments (task_id, period_date)
                WHERE period_date IS NOT NULL""",
+
             """CREATE UNIQUE INDEX IF NOT EXISTS uq_assignment_weekly
                ON assignments (task_id, period_week)
-               WHERE period_week IS NOT NULL"""
+               WHERE period_week IS NOT NULL""",
+
+            // ── Feature: task deadline date ──────────────────────────────────
+            // Adds the column only if it doesn't already exist (PostgreSQL 9.6+)
+            """ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deadline_date TIMESTAMP""",
+
+            // ── Feature: family WhatsApp phone numbers ───────────────────────
+            """ALTER TABLE family_config ADD COLUMN IF NOT EXISTS child1_phone VARCHAR(64) NOT NULL DEFAULT ''""",
+            """ALTER TABLE family_config ADD COLUMN IF NOT EXISTS child2_phone VARCHAR(64) NOT NULL DEFAULT ''"""
         )
 
         dataSource.connection.use { conn ->
-            sql.forEach { ddl ->
+            migrations.forEach { ddl ->
                 try {
                     conn.createStatement().use { stmt ->
                         stmt.execute(ddl.trimIndent())
-                        log.info("Schema: applied index — ${ddl.lines().first().trim()}")
+                        log.info("Schema migration applied: ${ddl.lines().first().trim()}")
                     }
                 } catch (e: Exception) {
-                    // Non-fatal: index may already exist with a different definition
-                    log.warn("Schema index skipped (${e.message})")
+                    // Non-fatal: index / column may already exist
+                    log.warn("Schema migration skipped (${e.message?.take(120)})")
                 }
             }
         }

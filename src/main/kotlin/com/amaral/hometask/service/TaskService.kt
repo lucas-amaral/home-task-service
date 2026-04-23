@@ -1,6 +1,6 @@
 package com.amaral.hometask.service
 
-import com.amaral.hometask.model.CreateTaskRequest
+import com.amaral.hometask.model.requests.CreateTaskRequest
 import com.amaral.hometask.model.Task
 import com.amaral.hometask.model.dtos.TaskDto
 import com.amaral.hometask.repository.TaskRepository
@@ -31,7 +31,7 @@ class TaskService(
 
     private fun Task.toDto() = TaskDto(
         id, name, description, type, frequency, defaultAssignee,
-        points, timeWindow, deadline, active, sortOrder
+        points, timeWindow, deadline, deadlineDate, active, sortOrder
     )
 }
 

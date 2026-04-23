@@ -1,6 +1,6 @@
 package com.amaral.hometask.controller
 
-import com.amaral.hometask.model.CreateTaskRequest
+import com.amaral.hometask.model.requests.CreateTaskRequest
 import com.amaral.hometask.service.TaskService
 import org.springframework.web.bind.annotation.*
 

@@ -1,4 +1,9 @@
-package com.amaral.hometask.model
+package com.amaral.hometask.model.requests
+
+import com.amaral.hometask.model.Assignee
+import com.amaral.hometask.model.TaskFrequency
+import com.amaral.hometask.model.TaskType
+import java.time.LocalDateTime
 
 data class CreateTaskRequest(
     val name: String,
@@ -9,5 +14,6 @@ data class CreateTaskRequest(
     val points: Int = 1,
     val timeWindow: String = "",
     val deadline: String = "",
+    val deadlineDate: LocalDateTime? = null,
     val sortOrder: Int = 0
 )

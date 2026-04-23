@@ -33,5 +33,10 @@ class AssignmentController(private val service: AssignmentService) {
     @PostMapping("/{id}/unpenalty")
     fun unpenalty(@PathVariable id: Long): ResponseEntity<AssignmentDto> =
         ResponseEntity.ok(service.removeManualPenalty(id))
-}
 
+    @DeleteMapping("/{id}")
+    fun delete(@PathVariable id: Long): ResponseEntity<Void> {
+        service.deleteAssignment(id)
+        return ResponseEntity.noContent().build()
+    }
+}

@@ -74,7 +74,8 @@ class BoardService(
         completedAt = completedAt,
         bonusEarned = bonusEarned,
         penaltyApplied = penaltyApplied,
-        points = task.points
+        points = task.points,
+        deadlineDate = task.deadlineDate
     )
 }
 

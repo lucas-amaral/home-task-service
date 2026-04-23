@@ -1,6 +1,6 @@
 package com.amaral.hometask.controller
 
-import com.amaral.hometask.model.UpdateFamilyConfigRequest
+import com.amaral.hometask.model.requests.UpdateFamilyConfigRequest
 import com.amaral.hometask.service.FamilyConfigService
 import org.springframework.web.bind.annotation.*
 

@@ -1,6 +1,6 @@
 package com.amaral.hometask.controller
 
-import com.amaral.hometask.model.UpdateFamilyConfigRequest
+import com.amaral.hometask.model.requests.UpdateFamilyConfigRequest
 import com.amaral.hometask.model.dtos.FamilyConfigDto
 import com.amaral.hometask.service.FamilyConfigService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -26,7 +26,7 @@ class FamilyConfigControllerTest {
 
     @Test
     fun `GET config returns family names`() {
-        whenever(service.getFamilyConfig()).thenReturn(FamilyConfigDto("Alice", "Bob"))
+        whenever(service.getFamilyConfig()).thenReturn(FamilyConfigDto("Alice", "Bob", "111", "222"))
 
         mvc.get("/api/config").andExpect {
             status { isOk() }
@@ -38,7 +38,7 @@ class FamilyConfigControllerTest {
     @Test
     fun `PUT config updates family names`() {
         val req = UpdateFamilyConfigRequest("Luisa", "Pedro")
-        whenever(service.updateFamilyConfig(any())).thenReturn(FamilyConfigDto("Luisa", "Pedro"))
+        whenever(service.updateFamilyConfig(any())).thenReturn(FamilyConfigDto("Luisa", "Pedro", "111", "222"))
 
         mvc.put("/api/config") {
             contentType = MediaType.APPLICATION_JSON

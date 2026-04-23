@@ -56,7 +56,7 @@ class BoardServiceTest {
         val dailyTask = makeTask(id = 1L, frequency = TaskFrequency.DAILY)
         val assignment = makeAssignment(task = dailyTask, periodDate = monday)
         whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(dailyTask))
-        whenever(familyConfigService.getFamilyConfig()).thenReturn(FamilyConfigDto("TestChild1", "TestChild2"))
+        whenever(familyConfigService.getFamilyConfig()).thenReturn(FamilyConfigDto("TestChild1", "TestChild2", "111", "222"))
         whenever(pointLedgerService.weekPointsMap(monday)).thenReturn(emptyMap())
         whenever(assignmentService.ensureDailyAssignment(dailyTask, monday)).thenReturn(assignment)
 
@@ -73,7 +73,7 @@ class BoardServiceTest {
         val weeklyTask = makeTask(id = 2L, type = TaskType.WEEKLY, frequency = TaskFrequency.WEEKLY)
         val assignment = makeAssignment(task = weeklyTask, periodDate = null, periodWeek = monday)
         whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(weeklyTask))
-        whenever(familyConfigService.getFamilyConfig()).thenReturn(FamilyConfigDto("TestChild1", "TestChild2"))
+        whenever(familyConfigService.getFamilyConfig()).thenReturn(FamilyConfigDto("TestChild1", "TestChild2", "111", "222"))
         whenever(pointLedgerService.weekPointsMap(monday)).thenReturn(emptyMap())
         whenever(assignmentService.ensureWeeklyAssignment(weeklyTask, monday)).thenReturn(assignment)
 

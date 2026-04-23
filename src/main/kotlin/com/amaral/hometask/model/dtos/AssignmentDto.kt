@@ -10,7 +10,7 @@ data class AssignmentDto(
     val id: Long,
     val taskId: Long,
     val taskName: String,
-    var taskDescription : String,
+    var taskDescription: String,
     val taskType: TaskType,
     val taskFrequency: TaskFrequency,
     val assignedTo: Assignee,
@@ -20,5 +20,7 @@ data class AssignmentDto(
     val completedAt: LocalDateTime?,
     val bonusEarned: Boolean,
     val penaltyApplied: Boolean,
-    val points: Int
+    val points: Int,
+    /** Optional hard deadline date-time from the task definition */
+    val deadlineDate: LocalDateTime?
 )
