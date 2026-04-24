@@ -18,6 +18,6 @@ data class FamilyConfig(
      * Format: international, digits only — e.g. "5554999990000"
      * Leave blank to disable notifications for that child.
      */
-    val child1Phone: String = "",
-    val child2Phone: String = ""
+    val child1Phone: String? = "",
+    val child2Phone: String? = ""
 )

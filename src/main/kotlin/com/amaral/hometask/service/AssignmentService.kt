@@ -165,15 +165,15 @@ class AssignmentService(
         val taskName = assignment.task.name
         val message  = "⚠️ Tarefa não concluída: \"$taskName\" estava com prazo para hoje. Foi aplicada uma penalidade de -1 ponto."
 
-        fun phoneFor(assignee: Assignee): String = when (assignee) {
+        fun phoneFor(assignee: Assignee): String? = when (assignee) {
             Assignee.CHILD1 -> cfg.child1Phone
             Assignee.CHILD2 -> cfg.child2Phone
-            else            -> ""
+            else            -> null
         }
 
         resolvePersons(assignment.assignedTo).forEach { person ->
             val phone = phoneFor(person)
-            if (phone.isNotBlank()) {
+            if (!phone.isNullOrBlank()) {
                 whatsAppNotifier.send(phone, message)
             }
         }

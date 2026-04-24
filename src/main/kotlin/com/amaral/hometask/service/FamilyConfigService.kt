@@ -35,7 +35,7 @@ class FamilyConfigService(
     private fun FamilyConfig.toDto() = FamilyConfigDto(
         child1Name = child1Name,
         child2Name = child2Name,
-        child1Phone = child1Phone,
-        child2Phone = child2Phone
+        child1Phone = child1Phone ?: "",
+        child2Phone = child2Phone ?: ""
     )
 }
