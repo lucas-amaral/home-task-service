@@ -38,7 +38,13 @@ class SchemaInitializer(private val dataSource: DataSource) {
 
             // ── Feature: family WhatsApp phone numbers ───────────────────────
             """ALTER TABLE family_config ADD COLUMN IF NOT EXISTS child1_phone VARCHAR(64) NOT NULL DEFAULT ''""",
-            """ALTER TABLE family_config ADD COLUMN IF NOT EXISTS child2_phone VARCHAR(64) NOT NULL DEFAULT ''"""
+            """ALTER TABLE family_config ADD COLUMN IF NOT EXISTS child2_phone VARCHAR(64) NOT NULL DEFAULT ''""",
+
+            // ── Feature: assignment tombstones for period delete ─────────────
+            """ALTER TABLE assignments ADD COLUMN IF NOT EXISTS deleted BOOLEAN""",
+            """UPDATE assignments SET deleted = false WHERE deleted IS NULL""",
+            """ALTER TABLE assignments ALTER COLUMN deleted SET DEFAULT false""",
+            """ALTER TABLE assignments ALTER COLUMN deleted SET NOT NULL"""
         )
 
         dataSource.connection.use { conn ->

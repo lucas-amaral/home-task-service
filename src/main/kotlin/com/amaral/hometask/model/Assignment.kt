@@ -57,7 +57,7 @@ data class Assignment(
      * User-deleted for this exact period. Kept as a tombstone so board refreshes
      * do not recreate the assignment for active recurring tasks.
      */
-    val deleted: Boolean = false
+    val deleted: Boolean? = false
 ) {
     /** Convenience: the date to display on the post-it */
     val displayDate: LocalDate get() = periodDate ?: periodWeek!!

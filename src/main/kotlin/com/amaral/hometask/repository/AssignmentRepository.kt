@@ -31,7 +31,7 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
         SELECT a FROM Assignment a
         WHERE a.task.id = :taskId
           AND a.periodDate = :date
-          AND a.deleted = false
+          AND COALESCE(a.deleted, false) = false
         ORDER BY a.id ASC
     """)
     fun findVisibleByTaskIdAndPeriodDate(taskId: Long, date: LocalDate): List<Assignment>
@@ -55,7 +55,7 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
         SELECT a FROM Assignment a
         WHERE a.task.id = :taskId
           AND a.periodWeek = :weekStart
-          AND a.deleted = false
+          AND COALESCE(a.deleted, false) = false
         ORDER BY a.id ASC
     """)
     fun findVisibleByTaskIdAndPeriodWeek(taskId: Long, weekStart: LocalDate): List<Assignment>
@@ -99,7 +99,7 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
         SELECT a FROM Assignment a
         WHERE (a.periodWeek = :weekStart
            OR (a.periodDate >= :weekStart AND a.periodDate < :weekEnd))
-          AND a.deleted = false
+          AND COALESCE(a.deleted, false) = false
     """)
     fun findAllForWeek(weekStart: LocalDate, weekEnd: LocalDate): List<Assignment>
 
@@ -108,7 +108,7 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
         WHERE a.completedAt IS NULL
           AND a.penaltyApplied = false
           AND a.missedDeadline = false
-          AND a.deleted = false
+          AND COALESCE(a.deleted, false) = false
           AND a.assignedTo IN ('CHILD1', 'CHILD2')
           AND (a.periodDate = :date OR a.periodWeek = :weekStart)
     """)

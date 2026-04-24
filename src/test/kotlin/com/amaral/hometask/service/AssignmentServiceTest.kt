@@ -17,9 +17,9 @@ import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.mockito.kotlin.never
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.Optional
@@ -59,7 +59,10 @@ class AssignmentServiceTest {
         periodDate: LocalDate? = monday,
         periodWeek: LocalDate? = null,
         completedAt: LocalDateTime? = null,
-        bonusEarned: Boolean = false
+        bonusEarned: Boolean = false,
+        penaltyApplied: Boolean = false,
+        missedDeadline: Boolean = false,
+        deleted: Boolean? = false
     ) = Assignment(
         id = id,
         task = task,
@@ -67,7 +70,10 @@ class AssignmentServiceTest {
         periodDate = periodDate,
         periodWeek = periodWeek,
         completedAt = completedAt,
-        bonusEarned = bonusEarned
+        bonusEarned = bonusEarned,
+        penaltyApplied = penaltyApplied,
+        missedDeadline = missedDeadline,
+        deleted = deleted
     )
 
     @Test
@@ -191,7 +197,7 @@ class AssignmentServiceTest {
 
         verify(assignmentRepo).save(argThat {
             id == 10L &&
-            deleted &&
+            deleted == true &&
             completedAt == null &&
             !bonusEarned &&
             !penaltyApplied &&
@@ -204,7 +210,7 @@ class AssignmentServiceTest {
     fun `assignTask revives deleted assignment for same period`() {
         val task = makeTask(id = 1L)
         val req = AssignRequest(taskId = 1L, assignedTo = Assignee.CHILD2, date = monday)
-        val deletedAssignment = makeAssignment(assignedTo = Assignee.CHILD1).copy(deleted = true)
+        val deletedAssignment = makeAssignment(assignedTo = Assignee.CHILD1, deleted = true)
         whenever(taskRepo.findById(1L)).thenReturn(Optional.of(task))
         whenever(assignmentRepo.findAllByTaskIdAndPeriodDate(1L, monday)).thenReturn(listOf(deletedAssignment))
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
@@ -214,7 +220,7 @@ class AssignmentServiceTest {
         assertEquals(Assignee.CHILD2, dto.assignedTo)
         verify(assignmentRepo).save(argThat {
             id == deletedAssignment.id &&
-            !deleted &&
+            deleted == false &&
             assignedTo == Assignee.CHILD2
         })
     }
