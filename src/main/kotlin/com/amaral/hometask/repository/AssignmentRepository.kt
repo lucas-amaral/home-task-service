@@ -27,6 +27,15 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
     """)
     fun findAllByTaskIdAndPeriodDate(taskId: Long, date: LocalDate): List<Assignment>
 
+    @Query("""
+        SELECT a FROM Assignment a
+        WHERE a.task.id = :taskId
+          AND a.periodDate = :date
+          AND a.deleted = false
+        ORDER BY a.id ASC
+    """)
+    fun findVisibleByTaskIdAndPeriodDate(taskId: Long, date: LocalDate): List<Assignment>
+
     /** Single-result version – returns the first row if any duplicate exists. */
     fun findByTaskIdAndPeriodDate(taskId: Long, date: LocalDate): Assignment? {
         // Default Spring Data method – safe for the normal case (0 or 1 row).
@@ -42,6 +51,15 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
     """)
     fun findAllByTaskIdAndPeriodWeek(taskId: Long, weekStart: LocalDate): List<Assignment>
 
+    @Query("""
+        SELECT a FROM Assignment a
+        WHERE a.task.id = :taskId
+          AND a.periodWeek = :weekStart
+          AND a.deleted = false
+        ORDER BY a.id ASC
+    """)
+    fun findVisibleByTaskIdAndPeriodWeek(taskId: Long, weekStart: LocalDate): List<Assignment>
+
     /**
      * Portable idempotent insert for daily assignments.
      *
@@ -53,9 +71,9 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
     @Query(value = """
         INSERT INTO assignments
             (task_id, assigned_to, period_date, period_week,
-             completed_at, bonus_earned, penalty_applied, missed_deadline)
+             completed_at, bonus_earned, penalty_applied, missed_deadline, deleted)
         SELECT :taskId, :assignedTo, :periodDate, NULL,
-               NULL, false, false, false
+               NULL, false, false, false, false
         WHERE NOT EXISTS (
             SELECT 1 FROM assignments
             WHERE task_id = :taskId AND period_date = :periodDate
@@ -67,9 +85,9 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
     @Query(value = """
         INSERT INTO assignments
             (task_id, assigned_to, period_date, period_week,
-             completed_at, bonus_earned, penalty_applied, missed_deadline)
+             completed_at, bonus_earned, penalty_applied, missed_deadline, deleted)
         SELECT :taskId, :assignedTo, NULL, :periodWeek,
-               NULL, false, false, false
+               NULL, false, false, false, false
         WHERE NOT EXISTS (
             SELECT 1 FROM assignments 
             WHERE task_id = :taskId AND period_week = :periodWeek
@@ -79,8 +97,9 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
 
     @Query("""
         SELECT a FROM Assignment a
-        WHERE a.periodWeek = :weekStart
-           OR (a.periodDate >= :weekStart AND a.periodDate < :weekEnd)
+        WHERE (a.periodWeek = :weekStart
+           OR (a.periodDate >= :weekStart AND a.periodDate < :weekEnd))
+          AND a.deleted = false
     """)
     fun findAllForWeek(weekStart: LocalDate, weekEnd: LocalDate): List<Assignment>
 
@@ -89,6 +108,7 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
         WHERE a.completedAt IS NULL
           AND a.penaltyApplied = false
           AND a.missedDeadline = false
+          AND a.deleted = false
           AND a.assignedTo IN ('CHILD1', 'CHILD2')
           AND (a.periodDate = :date OR a.periodWeek = :weekStart)
     """)

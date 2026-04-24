@@ -83,4 +83,17 @@ class BoardServiceTest {
         assertEquals(1, board.assignments.size)
         assertEquals(weeklyTask.id, board.assignments[0].taskId)
     }
+
+    @Test
+    fun `getBoard does not show deleted assignment tombstones`() {
+        val dailyTask = makeTask(id = 1L, frequency = TaskFrequency.DAILY)
+        whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(dailyTask))
+        whenever(familyConfigService.getFamilyConfig()).thenReturn(FamilyConfigDto("TestChild1", "TestChild2", "111", "222"))
+        whenever(pointLedgerService.weekPointsMap(monday)).thenReturn(emptyMap())
+        whenever(assignmentService.ensureDailyAssignment(dailyTask, monday)).thenReturn(null)
+
+        val board = service.getBoard(monday)
+
+        assertEquals(0, board.assignments.size)
+    }
 }

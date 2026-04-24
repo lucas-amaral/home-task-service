@@ -24,14 +24,14 @@ class AssignmentService(
 
     // ── Board operations ─────────────────────────────────────────────────────
 
-    fun ensureDailyAssignment(task: Task, date: LocalDate): Assignment {
+    fun ensureDailyAssignment(task: Task, date: LocalDate): Assignment? {
         assignmentRepo.upsertDaily(task.id, task.defaultAssignee.name, date)
-        return assignmentRepo.findAllByTaskIdAndPeriodDate(task.id, date).first()
+        return assignmentRepo.findVisibleByTaskIdAndPeriodDate(task.id, date).firstOrNull()
     }
 
-    fun ensureWeeklyAssignment(task: Task, weekStart: LocalDate): Assignment {
+    fun ensureWeeklyAssignment(task: Task, weekStart: LocalDate): Assignment? {
         assignmentRepo.upsertWeekly(task.id, task.defaultAssignee.name, weekStart)
-        return assignmentRepo.findAllByTaskIdAndPeriodWeek(task.id, weekStart).first()
+        return assignmentRepo.findVisibleByTaskIdAndPeriodWeek(task.id, weekStart).firstOrNull()
     }
 
     // ── Assignment management ────────────────────────────────────────────────
@@ -51,7 +51,16 @@ class AssignmentService(
 
         val assignment = if (existing != null) {
             if (existing.completedAt != null) reversePoints(existing)
-            assignmentRepo.save(existing.copy(assignedTo = req.assignedTo, completedAt = null, bonusEarned = false))
+            assignmentRepo.save(
+                existing.copy(
+                    assignedTo = req.assignedTo,
+                    completedAt = null,
+                    bonusEarned = false,
+                    penaltyApplied = false,
+                    missedDeadline = false,
+                    deleted = false
+                )
+            )
         } else {
             assignmentRepo.save(
                 Assignment(task = task, assignedTo = req.assignedTo,
@@ -106,7 +115,8 @@ class AssignmentService(
     }
 
     /**
-     * Deletes an assignment row entirely.
+     * Hides an assignment for its current period without allowing BoardService
+     * to recreate it on the next refresh.
      * If the assignment had already been completed, the earned points are reversed first.
      * If a penalty was applied, the ledger deduction is also reversed.
      */
@@ -127,7 +137,15 @@ class AssignmentService(
                 .forEach { addLedger(it, week, +1, "Penalty reversed (assignment deleted): ${assignment.task.name}") }
         }
 
-        assignmentRepo.deleteById(id)
+        assignmentRepo.save(
+            assignment.copy(
+                completedAt = null,
+                bonusEarned = false,
+                penaltyApplied = false,
+                missedDeadline = false,
+                deleted = true
+            )
+        )
     }
 
     // ── Missed deadline penalties ────────────────────────────────────────────

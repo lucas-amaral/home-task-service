@@ -19,6 +19,7 @@ import org.mockito.kotlin.argThat
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.mockito.kotlin.never
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.Optional
@@ -178,5 +179,43 @@ class AssignmentServiceTest {
         service.applyPenalty(10L)
 
         verify(ledgerRepo).save(argThat { delta == -1 && assignee == Assignee.CHILD2 })
+    }
+
+    @Test
+    fun `deleteAssignment creates tombstone instead of hard deleting`() {
+        val assignment = makeAssignment()
+        whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
+        whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
+
+        service.deleteAssignment(10L)
+
+        verify(assignmentRepo).save(argThat {
+            id == 10L &&
+            deleted &&
+            completedAt == null &&
+            !bonusEarned &&
+            !penaltyApplied &&
+            !missedDeadline
+        })
+        verify(assignmentRepo, never()).deleteById(any())
+    }
+
+    @Test
+    fun `assignTask revives deleted assignment for same period`() {
+        val task = makeTask(id = 1L)
+        val req = AssignRequest(taskId = 1L, assignedTo = Assignee.CHILD2, date = monday)
+        val deletedAssignment = makeAssignment(assignedTo = Assignee.CHILD1).copy(deleted = true)
+        whenever(taskRepo.findById(1L)).thenReturn(Optional.of(task))
+        whenever(assignmentRepo.findAllByTaskIdAndPeriodDate(1L, monday)).thenReturn(listOf(deletedAssignment))
+        whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
+
+        val dto = service.assignTask(req)
+
+        assertEquals(Assignee.CHILD2, dto.assignedTo)
+        verify(assignmentRepo).save(argThat {
+            id == deletedAssignment.id &&
+            !deleted &&
+            assignedTo == Assignee.CHILD2
+        })
     }
 }

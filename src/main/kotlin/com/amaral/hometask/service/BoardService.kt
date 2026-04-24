@@ -39,14 +39,14 @@ class BoardService(
 
         val assignments = tasks.flatMap { task ->
             when (task.frequency) {
-                TaskFrequency.DAILY    -> listOf(assignmentService.ensureDailyAssignment(task, date))
-                TaskFrequency.WEEKLY   -> listOf(assignmentService.ensureWeeklyAssignment(task, week))
+                TaskFrequency.DAILY    -> listOfNotNull(assignmentService.ensureDailyAssignment(task, date))
+                TaskFrequency.WEEKLY   -> listOfNotNull(assignmentService.ensureWeeklyAssignment(task, week))
                 TaskFrequency.BIWEEKLY -> {
                     val weekNumber = week.dayOfYear / 7
-                    if (weekNumber % 2 == 0) listOf(assignmentService.ensureWeeklyAssignment(task, week)) else emptyList()
+                    if (weekNumber % 2 == 0) listOfNotNull(assignmentService.ensureWeeklyAssignment(task, week)) else emptyList()
                 }
                 TaskFrequency.MONTHLY  -> {
-                    if (week.dayOfMonth <= 7) listOf(assignmentService.ensureWeeklyAssignment(task, week)) else emptyList()
+                    if (week.dayOfMonth <= 7) listOfNotNull(assignmentService.ensureWeeklyAssignment(task, week)) else emptyList()
                 }
             }
         }
@@ -78,4 +78,3 @@ class BoardService(
         deadlineDate = task.deadlineDate
     )
 }
-
