@@ -1,11 +1,13 @@
 package com.amaral.hometask.controller
 
 import com.amaral.hometask.model.AssignRequest
-import com.amaral.hometask.model.dtos.AssignmentDto
 import com.amaral.hometask.model.CompleteRequest
+import com.amaral.hometask.model.dtos.AssignmentDto
 import com.amaral.hometask.service.AssignmentService
+import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import java.time.LocalDate
 
 @RestController
 @RequestMapping("/api/assignments")
@@ -34,6 +36,11 @@ class AssignmentController(private val service: AssignmentService) {
     fun unpenalty(@PathVariable id: Long): ResponseEntity<AssignmentDto> =
         ResponseEntity.ok(service.removeManualPenalty(id))
 
+    /**
+     * Feature 1 — Delete an assignment.
+     * Points are reversed automatically if the assignment was completed.
+     * One-off parent tasks are deactivated so they don't reappear.
+     */
     @DeleteMapping("/{id}")
     fun delete(@PathVariable id: Long): ResponseEntity<Void> {
         service.deleteAssignment(id)

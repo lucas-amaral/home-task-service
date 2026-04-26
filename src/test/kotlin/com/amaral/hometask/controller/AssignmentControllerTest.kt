@@ -31,7 +31,6 @@ class AssignmentControllerTest {
     @MockBean lateinit var service: AssignmentService
 
     private val today = LocalDate.of(2024, 1, 15)
-    private val todayWithTime: LocalDateTime = today.atStartOfDay()
 
     @Test
     fun `POST assign returns updated assignment`() {
@@ -49,8 +48,7 @@ class AssignmentControllerTest {
             completedAt = null,
             bonusEarned = false,
             penaltyApplied = false,
-            points = 1,
-            deadlineDate = todayWithTime
+            points = 1
         )
         whenever(service.assignTask(any())).thenReturn(dto)
 
@@ -79,8 +77,7 @@ class AssignmentControllerTest {
             completedAt = LocalDateTime.now(),
             bonusEarned = true,
             penaltyApplied = false,
-            points = 1,
-            deadlineDate = todayWithTime
+            points = 1
         )
         whenever(service.completeAssignment(eq(10L), any())).thenReturn(dto)
 

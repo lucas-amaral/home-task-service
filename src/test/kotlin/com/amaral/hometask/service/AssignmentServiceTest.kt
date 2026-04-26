@@ -30,9 +30,8 @@ class AssignmentServiceTest {
     private val taskRepo: TaskRepository = mock()
     private val ledgerRepo: PointLedgerRepository = mock()
     private val familyConfigService: FamilyConfigService = mock()
-    private val whatsAppNotifier: WhatsAppNotifier = mock()
 
-    private val service = AssignmentService(assignmentRepo, taskRepo, ledgerRepo, familyConfigService, whatsAppNotifier)
+    private val service = AssignmentService(assignmentRepo, taskRepo, ledgerRepo, familyConfigService)
 
     private val monday = LocalDate.of(2024, 1, 15)
 

@@ -6,6 +6,7 @@ import com.amaral.hometask.model.Task
 import com.amaral.hometask.model.TaskFrequency
 import com.amaral.hometask.model.TaskType
 import com.amaral.hometask.model.dtos.FamilyConfigDto
+import com.amaral.hometask.repository.AssignmentRepository
 import com.amaral.hometask.repository.TaskRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -17,11 +18,12 @@ import java.time.LocalDate
 class BoardServiceTest {
 
     private val taskRepo: TaskRepository = mock()
+    private val assignmentRepo: AssignmentRepository = mock()
     private val assignmentService: AssignmentService = mock()
     private val familyConfigService: FamilyConfigService = mock()
     private val pointLedgerService: PointLedgerService = mock()
 
-    private val service = BoardService(taskRepo, assignmentService, familyConfigService, pointLedgerService)
+    private val service = BoardService(taskRepo, assignmentRepo, assignmentService, familyConfigService, pointLedgerService)
 
     private val monday = LocalDate.of(2024, 1, 15)
     private val tuesday = monday.plusDays(1)

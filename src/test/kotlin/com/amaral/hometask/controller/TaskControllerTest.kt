@@ -35,7 +35,7 @@ class TaskControllerTest {
             deadline = "any time",
             active = true,
             sortOrder = 1,
-            deadlineDate = null
+            oneOff = true
         )
         whenever(service.listTasks()).thenReturn(listOf(task))
 

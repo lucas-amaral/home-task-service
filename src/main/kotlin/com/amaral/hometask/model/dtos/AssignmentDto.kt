@@ -20,7 +20,5 @@ data class AssignmentDto(
     val completedAt: LocalDateTime?,
     val bonusEarned: Boolean,
     val penaltyApplied: Boolean,
-    val points: Int,
-    /** Optional hard deadline date-time from the task definition */
-    val deadlineDate: LocalDateTime?
+    val points: Int
 )

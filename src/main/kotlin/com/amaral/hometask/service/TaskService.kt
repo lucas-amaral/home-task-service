@@ -8,9 +8,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
-class TaskService(
-    private val taskRepo: TaskRepository
-) {
+class TaskService(private val taskRepo: TaskRepository) {
 
     fun listTasks(): List<TaskDto> =
         taskRepo.findByActiveTrueOrderBySortOrderAsc().map { it.toDto() }
@@ -23,15 +21,13 @@ class TaskService(
                 type = req.type, frequency = req.frequency,
                 defaultAssignee = req.defaultAssignee,
                 points = req.points, timeWindow = req.timeWindow,
-                deadline = req.deadline, sortOrder = req.sortOrder
+                deadline = req.deadline, sortOrder = req.sortOrder,
+                oneOff = req.oneOff
             )
         ).toDto()
 
-    // ── Mappers ──────────────────────────────────────────────────────
-
     private fun Task.toDto() = TaskDto(
         id, name, description, type, frequency, defaultAssignee,
-        points, timeWindow, deadline, deadlineDate, active, sortOrder
+        points, timeWindow, deadline, active, sortOrder, oneOff
     )
 }
-

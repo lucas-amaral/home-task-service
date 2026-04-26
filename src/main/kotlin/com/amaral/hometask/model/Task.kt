@@ -7,7 +7,6 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
-import java.time.LocalDateTime
 
 @Entity
 @Table(name = "tasks")
@@ -24,23 +23,25 @@ data class Task(
     @Enumerated(EnumType.STRING)
     val frequency: TaskFrequency,
 
-    /** Default assignee (pre-populated); can be overridden per period */
     @Enumerated(EnumType.STRING)
     val defaultAssignee: Assignee = Assignee.UNASSIGNED,
 
     val points: Int = 1,
     val timeWindow: String = "",
 
-    /** Legacy text deadline kept for display ("até 19:30") */
+    /**
+     * Deadline as HH:mm string (e.g. "13:05").
+     * Parsed by DeadlineNotificationScheduler to determine if a task is overdue.
+     */
     val deadline: String = "",
 
-    /**
-     * Optional hard deadline date-time for the assignment.
-     * When set and the assignment is not completed by this instant,
-     * a WhatsApp notification is sent to the child's registered phone.
-     */
-    val deadlineDate: LocalDateTime? = null,
-
     val active: Boolean = true,
-    val sortOrder: Int = 0
+    val sortOrder: Int = 0,
+
+    /**
+     * When true this task was created ad-hoc for a single day (one-off).
+     * BoardService will NEVER call upsertDaily/upsertWeekly for one-off tasks —
+     * the assignment created at the time of task creation is the only one ever made.
+     */
+    val oneOff: Boolean = false
 )

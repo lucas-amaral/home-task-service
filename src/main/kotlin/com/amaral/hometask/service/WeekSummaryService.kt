@@ -41,7 +41,6 @@ class WeekSummaryService(
         completedAt = completedAt,
         bonusEarned = bonusEarned,
         penaltyApplied = penaltyApplied,
-        points = task.points,
-        deadlineDate = task.deadlineDate
+        points = task.points
     )
 }

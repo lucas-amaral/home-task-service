@@ -18,20 +18,19 @@ class AssignmentService(
     private val assignmentRepo: AssignmentRepository,
     private val taskRepo: TaskRepository,
     private val ledgerRepo: PointLedgerRepository,
-    private val familyConfigService: FamilyConfigService,
-    private val whatsAppNotifier: WhatsAppNotifier
+    private val familyConfigService: FamilyConfigService
 ) {
 
     // ── Board operations ─────────────────────────────────────────────────────
 
-    fun ensureDailyAssignment(task: Task, date: LocalDate): Assignment? {
+    fun ensureDailyAssignment(task: Task, date: LocalDate): Assignment {
         assignmentRepo.upsertDaily(task.id, task.defaultAssignee.name, date)
-        return assignmentRepo.findVisibleByTaskIdAndPeriodDate(task.id, date).firstOrNull()
+        return assignmentRepo.findAllByTaskIdAndPeriodDate(task.id, date).first()
     }
 
-    fun ensureWeeklyAssignment(task: Task, weekStart: LocalDate): Assignment? {
+    fun ensureWeeklyAssignment(task: Task, weekStart: LocalDate): Assignment {
         assignmentRepo.upsertWeekly(task.id, task.defaultAssignee.name, weekStart)
-        return assignmentRepo.findVisibleByTaskIdAndPeriodWeek(task.id, weekStart).firstOrNull()
+        return assignmentRepo.findAllByTaskIdAndPeriodWeek(task.id, weekStart).first()
     }
 
     // ── Assignment management ────────────────────────────────────────────────
@@ -51,16 +50,7 @@ class AssignmentService(
 
         val assignment = if (existing != null) {
             if (existing.completedAt != null) reversePoints(existing)
-            assignmentRepo.save(
-                existing.copy(
-                    assignedTo = req.assignedTo,
-                    completedAt = null,
-                    bonusEarned = false,
-                    penaltyApplied = false,
-                    missedDeadline = false,
-                    deleted = false
-                )
-            )
+            assignmentRepo.save(existing.copy(assignedTo = req.assignedTo, completedAt = null, bonusEarned = false))
         } else {
             assignmentRepo.save(
                 Assignment(task = task, assignedTo = req.assignedTo,
@@ -115,37 +105,26 @@ class AssignmentService(
     }
 
     /**
-     * Hides an assignment for its current period without allowing BoardService
-     * to recreate it on the next refresh.
-     * If the assignment had already been completed, the earned points are reversed first.
-     * If a penalty was applied, the ledger deduction is also reversed.
+     * Feature 1 — Delete an assignment entirely.
+     *
+     * If the assignment had been completed, points are reversed in the ledger
+     * before deletion so the week totals stay accurate.
+     * One-off task assignments also deactivate the parent task so it won't
+     * show up anywhere else.
      */
     @Transactional
     fun deleteAssignment(id: Long) {
         val assignment = findAssignment(id)
 
-        // Reverse points if completed
-        if (assignment.completedAt != null) {
-            reversePoints(assignment)
+        // Reverse points if it was completed
+        if (assignment.completedAt != null) reversePoints(assignment)
+
+        // If the parent task is a one-off, deactivate it so it disappears everywhere
+        if (assignment.task.oneOff) {
+            taskRepo.save(assignment.task.copy(active = false))
         }
 
-        // Reverse penalty ledger entry if a manual penalty was applied
-        // (missed-deadline penalties are left as-is for audit purposes)
-        if (assignment.penaltyApplied && !assignment.missedDeadline) {
-            val week = weekStart(assignment.displayDate)
-            resolvePersons(assignment.assignedTo)
-                .forEach { addLedger(it, week, +1, "Penalty reversed (assignment deleted): ${assignment.task.name}") }
-        }
-
-        assignmentRepo.save(
-            assignment.copy(
-                completedAt = null,
-                bonusEarned = false,
-                penaltyApplied = false,
-                missedDeadline = false,
-                deleted = true
-            )
-        )
+        assignmentRepo.deleteById(id)
     }
 
     // ── Missed deadline penalties ────────────────────────────────────────────
@@ -163,37 +142,33 @@ class AssignmentService(
                 }
             }
 
-        val cfg = familyConfigService.getFamilyConfigEntity()
-
         candidates.forEach { a ->
             assignmentRepo.save(a.copy(missedDeadline = true, penaltyApplied = true))
             resolvePersons(a.assignedTo)
                 .forEach { person -> addLedger(person, week, -1, "Missed deadline: ${a.task.name}") }
-
-            // Send WhatsApp notifications if the task has a deadlineDate and it has passed
-            if (a.task.deadlineDate != null && a.task.deadlineDate <= LocalDateTime.now()) {
-                sendDeadlineNotification(a, cfg)
-            }
         }
 
         return candidates.size
     }
 
-    private fun sendDeadlineNotification(assignment: Assignment, cfg: FamilyConfig) {
-        val taskName = assignment.task.name
-        val message  = "⚠️ Tarefa não concluída: \"$taskName\" estava com prazo para hoje. Foi aplicada uma penalidade de -1 ponto."
-
-        fun phoneFor(assignee: Assignee): String? = when (assignee) {
-            Assignee.CHILD1 -> cfg.child1Phone
-            Assignee.CHILD2 -> cfg.child2Phone
-            else            -> null
-        }
-
-        resolvePersons(assignment.assignedTo).forEach { person ->
-            val phone = phoneFor(person)
-            if (!phone.isNullOrBlank()) {
-                whatsAppNotifier.send(phone, message)
-            }
+    /**
+     * Feature 3 — Returns assignments whose deadline has passed in the current
+     * hour but are not yet completed, not already penalised, and have a valid
+     * HH:mm deadline string.
+     *
+     * Called by [DeadlineNotificationScheduler] at XX:05 every hour.
+     */
+    fun findOverdueForNotification(date: LocalDate, hour: Int): List<Assignment> {
+        val week = weekStart(date)
+        return assignmentRepo.findMissedCandidates(date, week).filter { a ->
+            val dl = a.task.deadline.trim()
+            if (dl.isBlank()) return@filter false
+            try {
+                val parts = dl.split(":")
+                val dlHour = parts[0].toInt()
+                // Fire when the deadline hour matches the current check hour
+                dlHour == hour
+            } catch (_: Exception) { false }
         }
     }
 
@@ -232,19 +207,12 @@ class AssignmentService(
     // ── Mappers ──────────────────────────────────────────────────────────────
 
     fun Assignment.toDto() = AssignmentDto(
-        id              = id,
-        taskId          = task.id,
-        taskName        = task.name,
+        id = id, taskId = task.id, taskName = task.name,
         taskDescription = task.description,
-        taskType        = task.type,
-        taskFrequency   = task.frequency,
-        assignedTo      = assignedTo,
-        periodDate      = displayDate,
-        completed       = completedAt != null,
-        completedAt     = completedAt,
-        bonusEarned     = bonusEarned,
-        penaltyApplied  = penaltyApplied,
-        points          = task.points,
-        deadlineDate    = task.deadlineDate
+        taskType = task.type, taskFrequency = task.frequency,
+        assignedTo = assignedTo, periodDate = displayDate,
+        completed = completedAt != null, completedAt = completedAt,
+        bonusEarned = bonusEarned, penaltyApplied = penaltyApplied,
+        points = task.points
     )
 }
