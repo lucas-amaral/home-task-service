@@ -39,8 +39,9 @@ class SchemaInitializer(private val dataSource: DataSource) {
                 val registry = beanFactory as? BeanDefinitionRegistry ?: return@BeanFactoryPostProcessor
                 if (registry.containsBeanDefinition("entityManagerFactory")) {
                     val beanDefinition = registry.getBeanDefinition("entityManagerFactory")
-                    val currentDependsOn = beanDefinition.dependsOn.orEmpty()
-                    beanDefinition.setDependsOn(*(currentDependsOn + "schemaMigrationExecutor").distinct().toTypedArray())
+                    val currentDependsOn = beanDefinition.dependsOn?.toList().orEmpty()
+                    val updatedDependsOn = (currentDependsOn + "schemaMigrationExecutor").distinct().toTypedArray()
+                    beanDefinition.setDependsOn(*updatedDependsOn)
                 }
             }
         }
