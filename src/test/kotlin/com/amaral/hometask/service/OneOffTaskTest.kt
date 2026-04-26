@@ -88,6 +88,14 @@ class OneOffTaskTest {
         service.deleteAssignment(10L)
 
         verify(taskRepo, never()).save(any())
-        verify(assignmentRepo).deleteById(10L)
+        verify(assignmentRepo).save(argThat {
+            id == 10L &&
+            deleted == true &&
+            completedAt == null &&
+            !bonusEarned &&
+            !penaltyApplied &&
+            !missedDeadline
+        })
+        verify(assignmentRepo, never()).deleteById(any())
     }
 }

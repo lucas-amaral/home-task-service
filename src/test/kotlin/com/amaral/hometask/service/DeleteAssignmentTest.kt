@@ -37,18 +37,26 @@ class DeleteAssignmentTest {
     }
 
     @Test
-    fun `deleteAssignment removes row`() {
+    fun `deleteAssignment creates tombstone for recurring assignment`() {
         val task = regularTask()
         val assignment = Assignment(id = 10L, task = task, assignedTo = Assignee.CHILD1, periodDate = monday)
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
 
         service.deleteAssignment(10L)
 
-        verify(assignmentRepo).deleteById(10L)
+        verify(assignmentRepo).save(argThat {
+            id == 10L &&
+            deleted == true &&
+            completedAt == null &&
+            !bonusEarned &&
+            !penaltyApplied &&
+            !missedDeadline
+        })
+        verify(assignmentRepo, never()).deleteById(any())
     }
 
     @Test
-    fun `deleteAssignment reverses points when completed`() {
+    fun `deleteAssignment reverses points when completed before tombstoning`() {
         val task = regularTask()
         val assignment = Assignment(
             id = 10L, task = task, assignedTo = Assignee.CHILD2,
@@ -60,7 +68,13 @@ class DeleteAssignmentTest {
 
         // task.points(2) + bonus(1) = 3 reversed
         verify(ledgerRepo).save(argThat { delta == -3 && assignee == Assignee.CHILD2 })
-        verify(assignmentRepo).deleteById(10L)
+        verify(assignmentRepo).save(argThat {
+            id == 10L &&
+            deleted == true &&
+            completedAt == null &&
+            !bonusEarned
+        })
+        verify(assignmentRepo, never()).deleteById(any())
     }
 
     @Test
@@ -72,7 +86,8 @@ class DeleteAssignmentTest {
         service.deleteAssignment(10L)
 
         verify(ledgerRepo, never()).save(any())
-        verify(assignmentRepo).deleteById(10L)
+        verify(assignmentRepo).save(argThat { deleted == true })
+        verify(assignmentRepo, never()).deleteById(any())
     }
 
     @Test
@@ -88,6 +103,7 @@ class DeleteAssignmentTest {
 
         verify(ledgerRepo).save(argThat { delta == -2 && assignee == Assignee.CHILD1 })
         verify(ledgerRepo).save(argThat { delta == -2 && assignee == Assignee.CHILD2 })
+        verify(assignmentRepo).save(argThat { deleted == true })
     }
 
     @Test

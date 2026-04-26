@@ -37,14 +37,14 @@ class BoardService(
 
         val assignments = recurringTasks.flatMap { task ->
             when (task.frequency) {
-                TaskFrequency.DAILY    -> listOf(assignmentService.ensureDailyAssignment(task, date))
-                TaskFrequency.WEEKLY   -> listOf(assignmentService.ensureWeeklyAssignment(task, week))
+                TaskFrequency.DAILY    -> assignmentService.ensureDailyAssignment(task, date).toVisibleList()
+                TaskFrequency.WEEKLY   -> assignmentService.ensureWeeklyAssignment(task, week).toVisibleList()
                 TaskFrequency.BIWEEKLY -> {
                     val weekNumber = week.dayOfYear / 7
-                    if (weekNumber % 2 == 0) listOf(assignmentService.ensureWeeklyAssignment(task, week)) else emptyList()
+                    if (weekNumber % 2 == 0) assignmentService.ensureWeeklyAssignment(task, week).toVisibleList() else emptyList()
                 }
                 TaskFrequency.MONTHLY  -> {
-                    if (week.dayOfMonth <= 7) listOf(assignmentService.ensureWeeklyAssignment(task, week)) else emptyList()
+                    if (week.dayOfMonth <= 7) assignmentService.ensureWeeklyAssignment(task, week).toVisibleList() else emptyList()
                 }
             }
         }
@@ -60,6 +60,9 @@ class BoardService(
             weekPoints  = pointLedgerService.weekPointsMap(week)
         )
     }
+
+    private fun Assignment?.toVisibleList(): List<Assignment> =
+        if (this != null && this.deleted != true) listOf(this) else emptyList()
 
     private fun Assignment.toDto() = AssignmentDto(
         id = id, taskId = task.id, taskName = task.name,

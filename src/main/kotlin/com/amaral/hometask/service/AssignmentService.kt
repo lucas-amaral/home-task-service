@@ -50,7 +50,16 @@ class AssignmentService(
 
         val assignment = if (existing != null) {
             if (existing.completedAt != null) reversePoints(existing)
-            assignmentRepo.save(existing.copy(assignedTo = req.assignedTo, completedAt = null, bonusEarned = false))
+            assignmentRepo.save(
+                existing.copy(
+                    assignedTo = req.assignedTo,
+                    completedAt = null,
+                    bonusEarned = false,
+                    penaltyApplied = false,
+                    missedDeadline = false,
+                    deleted = false
+                )
+            )
         } else {
             assignmentRepo.save(
                 Assignment(task = task, assignedTo = req.assignedTo,
@@ -119,12 +128,24 @@ class AssignmentService(
         // Reverse points if it was completed
         if (assignment.completedAt != null) reversePoints(assignment)
 
-        // If the parent task is a one-off, deactivate it so it disappears everywhere
         if (assignment.task.oneOff) {
+            // One-off tasks should fully disappear after deletion.
             taskRepo.save(assignment.task.copy(active = false))
+            assignmentRepo.deleteById(id)
+            return
         }
 
-        assignmentRepo.deleteById(id)
+        // Recurring tasks keep a tombstone for this period so board refreshes
+        // do not immediately recreate the assignment.
+        assignmentRepo.save(
+            assignment.copy(
+                completedAt = null,
+                bonusEarned = false,
+                penaltyApplied = false,
+                missedDeadline = false,
+                deleted = true
+            )
+        )
     }
 
     // ── Missed deadline penalties ────────────────────────────────────────────
