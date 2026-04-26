@@ -1,14 +1,22 @@
 package com.amaral.hometask.config
 
 import org.slf4j.LoggerFactory
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
-import org.springframework.boot.ApplicationRunner
-import org.springframework.context.annotation.Bean
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor
+import org.springframework.beans.factory.support.BeanDefinitionRegistry
 import javax.sql.DataSource
 
 /**
- * Applies schema changes that Hibernate's ddl-auto=update cannot handle:
+ * Applies schema changes before JPA starts.
+ *
+ * This covers changes that Hibernate's ddl-auto=update cannot handle safely on
+ * existing PostgreSQL tables, especially when a new NOT NULL column must be
+ * backfilled before the constraint is applied.
+ *
+ * It also creates partial unique indexes used by ON CONFLICT upserts.
+ *
  *  - Partial unique indexes (ON CONFLICT clauses for upsert operations)
  *  - ADD COLUMN IF NOT EXISTS for new fields introduced after initial deployment
  *
@@ -21,7 +29,29 @@ class SchemaInitializer(private val dataSource: DataSource) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     @Bean
-    fun applySchemaChanges() = ApplicationRunner {
+    fun schemaMigrationExecutor() = SchemaMigrationExecutor(dataSource, log)
+
+    companion object {
+        @Bean
+        @JvmStatic
+        fun entityManagerFactoryDependsOnSchemaMigration(): BeanFactoryPostProcessor {
+            return BeanFactoryPostProcessor { beanFactory ->
+                val registry = beanFactory as? BeanDefinitionRegistry ?: return@BeanFactoryPostProcessor
+                if (registry.containsBeanDefinition("entityManagerFactory")) {
+                    val beanDefinition = registry.getBeanDefinition("entityManagerFactory")
+                    val currentDependsOn = beanDefinition.dependsOn.orEmpty()
+                    beanDefinition.setDependsOn(*(currentDependsOn + "schemaMigrationExecutor").distinct().toTypedArray())
+                }
+            }
+        }
+    }
+}
+
+class SchemaMigrationExecutor(
+    private val dataSource: DataSource,
+    private val log: org.slf4j.Logger
+) {
+    init {
         val migrations = listOf(
             // ── Partial unique indexes ────────────────────────────────────────
             """CREATE UNIQUE INDEX IF NOT EXISTS uq_assignment_daily
@@ -35,6 +65,12 @@ class SchemaInitializer(private val dataSource: DataSource) {
             // ── Feature: task deadline date ──────────────────────────────────
             // Adds the column only if it doesn't already exist (PostgreSQL 9.6+)
             """ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deadline_date TIMESTAMP""",
+
+            // ── Feature: one-off tasks ───────────────────────────────────────
+            """ALTER TABLE tasks ADD COLUMN IF NOT EXISTS one_off BOOLEAN""",
+            """UPDATE tasks SET one_off = false WHERE one_off IS NULL""",
+            """ALTER TABLE tasks ALTER COLUMN one_off SET DEFAULT false""",
+            """ALTER TABLE tasks ALTER COLUMN one_off SET NOT NULL""",
 
             // ── Feature: family WhatsApp phone numbers ───────────────────────
             """ALTER TABLE family_config ADD COLUMN IF NOT EXISTS child1_phone VARCHAR(64) NOT NULL DEFAULT ''""",
