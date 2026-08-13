@@ -10,11 +10,11 @@ import com.amaral.hometask.repository.FamilyConfigRepository
 import com.amaral.hometask.repository.RewardRepository
 import com.amaral.hometask.repository.TaskRepository
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.boot.ApplicationRunner
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
+import jakarta.annotation.PostConstruct
 
 @Configuration
 class CorsConfig(@Value("\${app.frontend-url}") private val frontendUrl: String) : WebMvcConfigurer {
@@ -34,20 +34,37 @@ class DataSeeder(
     @Value("\${app.family.child1-name:Clara}") private val child1Name: String,
     @Value("\${app.family.child2-name:Bernardo}") private val child2Name: String
 ) {
-    @Bean
-    fun seedData() = ApplicationRunner {
+    private val log = org.slf4j.LoggerFactory.getLogger(javaClass)
+
+    @PostConstruct
+    fun seedData() {
+        log.info("Starting seed data initialization...")
+
         // Seed family config (only if not already set)
         if (!familyConfigRepo.existsById(1L)) {
+            log.info("Creating default family config with child1=$child1Name, child2=$child2Name")
             familyConfigRepo.save(FamilyConfig(id = 1L, child1Name = child1Name, child2Name = child2Name))
         }
 
         if (taskRepo.count() == 0L) {
-            taskRepo.saveAll(buildTasks())
+            val tasks = buildTasks()
+            log.info("Seeding ${tasks.size} tasks...")
+            taskRepo.saveAll(tasks)
+            log.info("Tasks seeded successfully")
+        } else {
+            log.info("Tasks already exist, skipping seeding")
         }
 
         if (rewardRepo.count() == 0L) {
-            rewardRepo.saveAll(buildRewards())
+            val rewards = buildRewards()
+            log.info("Seeding ${rewards.size} rewards...")
+            rewardRepo.saveAll(rewards)
+            log.info("Rewards seeded successfully")
+        } else {
+            log.info("Rewards already exist, skipping seeding")
         }
+
+        log.info("Seed data initialization completed")
     }
 
     /**
