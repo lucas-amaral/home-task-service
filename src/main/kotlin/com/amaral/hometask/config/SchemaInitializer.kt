@@ -81,7 +81,11 @@ class SchemaMigrationExecutor(
             """ALTER TABLE assignments ADD COLUMN IF NOT EXISTS deleted BOOLEAN""",
             """UPDATE assignments SET deleted = false WHERE deleted IS NULL""",
             """ALTER TABLE assignments ALTER COLUMN deleted SET DEFAULT false""",
-            """ALTER TABLE assignments ALTER COLUMN deleted SET NOT NULL"""
+            """ALTER TABLE assignments ALTER COLUMN deleted SET NOT NULL""",
+
+            // ── Fix: expand task description from VARCHAR(255) to TEXT ──────
+            // Required to support longer task descriptions with checklists
+            """ALTER TABLE tasks ALTER COLUMN description TYPE TEXT"""
         )
 
         dataSource.connection.use { conn ->
