@@ -38,6 +38,12 @@ class BoardService(
         val assignments = recurringTasks.flatMap { task ->
             when (task.frequency) {
                 TaskFrequency.DAILY    -> assignmentService.ensureDailyAssignment(task, date).toVisibleList()
+                TaskFrequency.EVERY_2_DAYS -> {
+                    // Fixed parity on the epoch day keeps a stable every-other-day cadence
+                    // regardless of when the task was created.
+                    if (date.toEpochDay() % 2L == 0L) assignmentService.ensureDailyAssignment(task, date).toVisibleList()
+                    else emptyList()
+                }
                 TaskFrequency.WEEKLY   -> assignmentService.ensureWeeklyAssignment(task, week).toVisibleList()
                 TaskFrequency.BIWEEKLY -> {
                     val weekNumber = week.dayOfYear / 7
@@ -57,7 +63,8 @@ class BoardService(
             date = date, weekStart = week,
             child1Name = cfg.child1Name, child2Name = cfg.child2Name,
             assignments = (assignments + oneOffToday).map { it.toDto() },
-            weekPoints  = pointLedgerService.weekPointsMap(week)
+            weekPoints  = pointLedgerService.weekPointsMap(week),
+            weeklyStatus = pointLedgerService.weeklyStatus(week, cfg.child1Name, cfg.child2Name)
         )
     }
 

@@ -49,7 +49,11 @@ class AssignmentService(
             assignmentRepo.findAllByTaskIdAndPeriodWeek(task.id, req.weekStart!!).firstOrNull()
 
         val assignment = if (existing != null) {
-            if (existing.completedAt != null) reversePoints(existing)
+            if (existing.penaltyApplied) {
+                val week = weekStart(existing.displayDate)
+                resolvePersons(existing.assignedTo)
+                    .forEach { addLedger(it, week, +1, "Reassigned, penalty reversed: ${existing.task.name}") }
+            }
             assignmentRepo.save(
                 existing.copy(
                     assignedTo = req.assignedTo,
@@ -69,23 +73,53 @@ class AssignmentService(
         return assignment.toDto()
     }
 
+    /**
+     * Complete an assignment and award points. Points awarded = task.points + 1 if bonusEarned.
+     * If a penalty was already applied for this exact assignment, we leave that penalty in place
+     * — completing late doesn't undo the occurrence, matching the "prazo perdido = ocorrência" rule.
+     */
     @Transactional
     fun completeAssignment(id: Long, req: CompleteRequest): AssignmentDto {
         val assignment = findAssignment(id)
         check(assignment.completedAt == null) { "Assignment already completed" }
-        val updated = assignmentRepo.save(
-            assignment.copy(completedAt = LocalDateTime.now(), bonusEarned = req.bonusEarned)
-        )
-        awardPoints(updated)
-        return updated.toDto()
+        val week = weekStart(assignment.displayDate)
+
+        // Award points: task.points + 1 if bonus earned
+        val delta = assignment.task.points + if (req.bonusEarned) 1 else 0
+        resolvePersons(assignment.assignedTo)
+            .forEach { person ->
+                addLedger(person, week, delta,
+                    if (req.bonusEarned) "Completed with bonus: ${assignment.task.name}"
+                    else "Completed: ${assignment.task.name}")
+            }
+
+        return assignmentRepo.save(
+            assignment.copy(
+                completedAt = LocalDateTime.now(),
+                bonusEarned = req.bonusEarned
+            )
+        ).toDto()
     }
 
     @Transactional
     fun uncompleteAssignment(id: Long): AssignmentDto {
         val assignment = findAssignment(id)
         if (assignment.completedAt == null) return assignment.toDto()
-        reversePoints(assignment)
-        return assignmentRepo.save(assignment.copy(completedAt = null, bonusEarned = false)).toDto()
+
+        // Reverse the points that were awarded
+        val week = weekStart(assignment.displayDate)
+        val delta = -(assignment.task.points + if (assignment.bonusEarned) 1 else 0)
+        resolvePersons(assignment.assignedTo)
+            .forEach { person ->
+                addLedger(person, week, delta, "Uncompleted: ${assignment.task.name}")
+            }
+
+        return assignmentRepo.save(
+            assignment.copy(
+                completedAt = null,
+                bonusEarned = false
+            )
+        ).toDto()
     }
 
     @Transactional
@@ -116,17 +150,31 @@ class AssignmentService(
     /**
      * Feature 1 — Delete an assignment entirely.
      *
-     * If the assignment had been completed, points are reversed in the ledger
-     * before deletion so the week totals stay accurate.
-     * One-off task assignments also deactivate the parent task so it won't
-     * show up anywhere else.
+     * If the assignment was completed, reverse the awarded points. If a penalty
+     * (occurrence) had also been recorded on it, that penalty is reversed in the
+     * ledger before deletion so the week totals stay accurate. One-off task
+     * assignments also deactivate the parent task so it won't show up anywhere else.
      */
     @Transactional
     fun deleteAssignment(id: Long) {
         val assignment = findAssignment(id)
+        val week = weekStart(assignment.displayDate)
 
-        // Reverse points if it was completed
-        if (assignment.completedAt != null) reversePoints(assignment)
+        // Reverse the points if the assignment was completed
+        if (assignment.completedAt != null) {
+            val delta = -(assignment.task.points + if (assignment.bonusEarned) 1 else 0)
+            resolvePersons(assignment.assignedTo)
+                .forEach { person ->
+                    addLedger(person, week, delta, "Assignment deleted, points reversed: ${assignment.task.name}")
+                }
+        }
+
+        // Reverse the −1 occurrence if a penalty had been recorded on this
+        // assignment — deleting it entirely means it should no longer count.
+        if (assignment.penaltyApplied) {
+            resolvePersons(assignment.assignedTo)
+                .forEach { addLedger(it, week, +1, "Assignment deleted, penalty reversed: ${assignment.task.name}") }
+        }
 
         if (assignment.task.oneOff) {
             // One-off tasks should fully disappear after deletion.
@@ -158,7 +206,7 @@ class AssignmentService(
         val candidates = assignmentRepo.findMissedCandidates(date, week)
             .filter { a ->
                 when (a.task.frequency) {
-                    TaskFrequency.DAILY -> true
+                    TaskFrequency.DAILY, TaskFrequency.EVERY_2_DAYS -> true
                     else -> isSunday
                 }
             }
@@ -197,20 +245,6 @@ class AssignmentService(
 
     private fun findAssignment(id: Long): Assignment =
         assignmentRepo.findById(id).orElseThrow { NoSuchElementException("Assignment $id not found") }
-
-    private fun awardPoints(assignment: Assignment) {
-        val pts = assignment.task.points + if (assignment.bonusEarned) 1 else 0
-        val week = weekStart(assignment.displayDate)
-        resolvePersons(assignment.assignedTo)
-            .forEach { addLedger(it, week, pts, "Completed: ${assignment.task.name}") }
-    }
-
-    private fun reversePoints(assignment: Assignment) {
-        val pts = assignment.task.points + if (assignment.bonusEarned) 1 else 0
-        val week = weekStart(assignment.displayDate)
-        resolvePersons(assignment.assignedTo)
-            .forEach { addLedger(it, week, -pts, "Reversed: ${assignment.task.name}") }
-    }
 
     private fun addLedger(person: Assignee, week: LocalDate, delta: Int, reason: String) {
         ledgerRepo.save(PointLedger(assignee = person, weekStart = week, delta = delta, reason = reason))

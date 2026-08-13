@@ -22,7 +22,8 @@ class WeekSummaryService(
                 weekStart = weekStart,
                 child1Name = cfg.child1Name, child2Name = cfg.child2Name,
                 assignments = assignments.map { it.toDto() },
-        points = pointLedgerService.weekPointsMap(weekStart)
+        points = pointLedgerService.weekPointsMap(weekStart),
+        weeklyStatus = pointLedgerService.weeklyStatus(weekStart, cfg.child1Name, cfg.child2Name)
         )
     }
 

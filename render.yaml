@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: home-task-service
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: TZ
+        value: America/Sao_Paulo
+      - key: DATABASE_URL
+        sync: false        # set manually to your Neon/Supabase connection string
+      - key: FRONTEND_URL
+        sync: false        # e.g. https://your-app.vercel.app
+      - key: CHILD1_NAME
+        sync: false
+      - key: CHILD2_NAME
+        sync: false
+      # Optional — WhatsApp deadline reminders via Twilio (leave unset to disable)
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WA_FROM
+        sync: false
+      - key: WHATSAPP_CHILD1
+        sync: false
+      - key: WHATSAPP_CHILD2
+        sync: false
+      - key: WHATSAPP_PARENTS
+        sync: false

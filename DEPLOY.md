@@ -1,107 +1,125 @@
-# Deployment Guide — Home Tasks
+# Deployment Guide — home-task-service (Backend)
+
+Railway's free trial expired, so this backend now deploys to **Render** (free web
+service tier, no card required, doesn't expire) with the database on
+**Neon** or **Supabase** (permanent free Postgres — Render's own free Postgres
+expires after 30 days, so we don't use it).
 
 ## Prerequisites
-- A GitHub account
-- A [Railway](https://railway.app) account
-- A [Vercel](https://vercel.com) account
+- A GitHub account with this repo pushed
+- A [Render](https://render.com) account
+- A [Neon](https://neon.tech) **or** [Supabase](https://supabase.com) account (either works — pick one)
 
-## 1. Push the Project to GitHub
+## 1. Create the database (Neon or Supabase)
 
-```bash
-cd home-task
-git init
-git add .
-git commit -m "feat: initial home tasks app"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/home-task-service.git
-git push -u origin main
-```
+**Neon:**
+1. Create a new project.
+2. Copy the connection string shown (it looks like
+   `postgres://user:pass@ep-xxx.neon.tech/dbname?sslmode=require`).
 
-## 2. Deploy the Backend to Railway
+**Supabase:**
+1. Create a new project (set a database password when prompted).
+2. Go to `Project Settings → Database → Connection string → URI`, copy it
+   (looks like `postgres://postgres:[password]@db.xxx.supabase.co:5432/postgres`).
 
-1. Open [railway.app](https://railway.app) and create a new project.
-2. Choose `Deploy from GitHub repo` and select `home-task-service`.
-3. Click `Add Service -> Database -> PostgreSQL`.
-4. In the application service settings, set `Root Directory` to `backend`.
-5. In `Variables`, add:
+Either format works as-is — the backend parses it automatically
+(`config/DatabaseConfig.kt`), adding `sslmode=require` if it's missing.
+You do **not** need to prefix it with `jdbc:` yourself.
 
-```text
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-DATABASE_USERNAME=${{Postgres.PGUSER}}
-DATABASE_PASSWORD=${{Postgres.PGPASSWORD}}
-FRONTEND_URL=https://your-app.vercel.app
-```
+## 2. Deploy the backend to Render
 
-The production profile also supports Railway's native `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD` variables, so mapping the PostgreSQL service is usually enough even without extra datasource variables.
+**Option A — Blueprint (recommended):**
+1. Push this repo to GitHub.
+2. In Render, click `New → Blueprint`, point it at the repo. It will read
+   `render.yaml` and set up the web service automatically (free plan, Docker
+   runtime, health check on `/api/health`).
+3. Fill in the env vars it asks for (see below).
 
-6. Railway will build and deploy the backend automatically.
-7. In `Settings -> Domains`, copy the generated URL, for example `https://home-task-service.up.railway.app`.
+**Option B — Manual:**
+1. `New → Web Service` → connect the repo.
+2. Runtime: `Docker` (uses the included `Dockerfile`).
+3. Plan: `Free`.
+4. Health Check Path: `/api/health`.
 
-## 3. Deploy the Frontend to Vercel
-
-1. Open [vercel.com](https://vercel.com) and create a new project.
-2. Import the `home-task` repository.
-3. Configure the project with:
-   `Root Directory`: `frontend`
-   `Build Command`: `npm run build`
-   `Output Directory`: `dist`
-4. Add this environment variable:
+### Required environment variables
 
 ```text
-VITE_API_URL=https://home-task-service.up.railway.app
+SPRING_PROFILES_ACTIVE = prod
+DATABASE_URL            = <connection string from step 1>
+FRONTEND_URL            = https://your-app.vercel.app
+TZ                      = America/Sao_Paulo
+CHILD1_NAME             = Clara
+CHILD2_NAME             = Bernardo
 ```
 
-5. Click `Deploy`.
-6. Copy the generated URL, for example `https://home-task.vercel.app`.
-
-## 4. Update CORS on Railway
-
-Go back to Railway and update:
+### Optional — WhatsApp deadline reminders (Twilio)
 
 ```text
-FRONTEND_URL=https://home-task-app.vercel.app
+TWILIO_ACCOUNT_SID = ...
+TWILIO_AUTH_TOKEN  = ...
+TWILIO_WA_FROM      = whatsapp:+1415...
+WHATSAPP_CHILD1     = whatsapp:+55...
+WHATSAPP_CHILD2     = whatsapp:+55...
+WHATSAPP_PARENTS    = whatsapp:+55...
 ```
 
-Railway will redeploy automatically.
+Leave these unset to skip WhatsApp notifications entirely — nothing else
+depends on them.
+
+5. Deploy. Render builds the Docker image and starts the service.
+6. Copy the generated URL, e.g. `https://home-task-service.onrender.com`.
+
+> **Free tier note:** the service spins down after ~15 min of inactivity and
+> takes 30–60s to wake up on the next request. That's fine for a household
+> board — the very first tap of the day might just take a moment.
+
+## 3. Point the frontend at the backend
+
+In Vercel (frontend project), set:
+
+```text
+VITE_API_URL = https://home-task-service.onrender.com
+```
+
+Redeploy the frontend so it picks up the new URL.
+
+## 4. First run — check the seed data
+
+On first boot with an empty database, `DataSeeder` populates the 6 house
+tasks and family config automatically. If you're migrating from an old
+database that still has the *previous* task list (points-based, no
+checklist), the seeder won't touch it — it only seeds when the tasks table
+is empty. In that case, either:
+- point `DATABASE_URL` at a **fresh** empty database (simplest), or
+- clear out the old tasks via the Admin page / `DELETE /api/tasks/{id}`, then
+  restart the service so it reseeds.
 
 ## Local Development
 
 ```bash
-# Terminal 1 - Backend
-cd backend
 ./gradlew bootRun
-# API at http://localhost:8080
-# H2 console at http://localhost:8080/h2-console
-
-# Terminal 2 - Frontend
-cd frontend
-cp .env.example .env.local
-npm install
-npm run dev
-# App at http://localhost:5173
+# API at http://localhost:8080 (H2 in-memory db, no setup needed)
+# H2 console at http://localhost:8080/h2-console (enable in application.properties)
 ```
 
 ## Updating Later
 
-Any `git push` to the `main` branch triggers automatic redeploys on Railway and Vercel.
-
-```bash
-git add .
-git commit -m "feat: new task"
-git push
-```
+Any `git push` to `main` triggers an automatic redeploy on Render.
 
 ## API Endpoints
 
 | Method | Route | Description |
 |--------|------|-------------|
 | GET  | `/api/health` | Health check |
-| GET  | `/api/board?weekStart=2024-01-15` | Weekly board |
+| GET  | `/api/board?date=2026-08-13` | Today's board (assignments + weekly status) |
+| GET  | `/api/weeks/{weekStart}` | Full week summary |
 | GET  | `/api/tasks` | List tasks |
 | POST | `/api/tasks` | Create task |
 | POST | `/api/assignments/assign` | Assign task |
-| POST | `/api/assignments/{id}/complete` | Mark as completed |
+| POST | `/api/assignments/{id}/complete` | Mark as completed (no points — punitive model) |
 | POST | `/api/assignments/{id}/uncomplete` | Undo completion |
-| POST | `/api/assignments/{id}/penalty` | Apply penalty |
-| GET  | `/api/rewards` | List rewards |
-| GET  | `/api/points/history` | Points history |
+| POST | `/api/assignments/{id}/penalty` | Register a −1 occurrence (not done / late / incomplete) |
+| DELETE | `/api/assignments/{id}` | Delete an assignment (reverses penalty if one was applied) |
+| GET  | `/api/rewards` | List rewards (optional, not tied to the automatic system) |
+| GET  | `/api/points/history` | Points history by week |
+| GET  | `/api/points/status?weekStart=` | Occurrence count + consequence ladder per child |

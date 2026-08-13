@@ -7,5 +7,6 @@ data class WeekSummaryDto(
     val child1Name: String,
     val child2Name: String,
     val assignments: List<AssignmentDto>,
-    val points: Map<String, Int>
+    val points: Map<String, Int>,
+    val weeklyStatus: List<WeeklyStatusDto> = emptyList()
 )
