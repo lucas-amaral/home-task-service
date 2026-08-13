@@ -108,43 +108,16 @@ class AssignmentServiceTest {
     }
 
     @Test
-    fun `completeAssignment awards points and sets completedAt`() {
+    fun `completeAssignment sets completedAt but awards no points (punitive model)`() {
         val task = makeTask(points = 2)
         val assignment = makeAssignment(task = task, assignedTo = Assignee.CHILD1)
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
-        whenever(ledgerRepo.save(any<PointLedger>())).thenAnswer { it.arguments[0] }
 
-        service.completeAssignment(10L, CompleteRequest(bonusEarned = false))
+        val dto = service.completeAssignment(10L, CompleteRequest())
 
-        verify(ledgerRepo).save(argThat { delta == 2 && assignee == Assignee.CHILD1 })
-    }
-
-    @Test
-    fun `completeAssignment awards bonus point when bonusEarned is true`() {
-        val task = makeTask(points = 1)
-        val assignment = makeAssignment(task = task, assignedTo = Assignee.CHILD2)
-        whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
-        whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
-        whenever(ledgerRepo.save(any<PointLedger>())).thenAnswer { it.arguments[0] }
-
-        service.completeAssignment(10L, CompleteRequest(bonusEarned = true))
-
-        verify(ledgerRepo).save(argThat { delta == 2 && assignee == Assignee.CHILD2 })
-    }
-
-    @Test
-    fun `completeAssignment awards points to both children for BOTH assignee`() {
-        val task = makeTask(points = 1)
-        val assignment = makeAssignment(task = task, assignedTo = Assignee.BOTH)
-        whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
-        whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
-        whenever(ledgerRepo.save(any<PointLedger>())).thenAnswer { it.arguments[0] }
-
-        service.completeAssignment(10L, CompleteRequest())
-
-        verify(ledgerRepo).save(argThat { assignee == Assignee.CHILD1 })
-        verify(ledgerRepo).save(argThat { assignee == Assignee.CHILD2 })
+        assertEquals(true, dto.completed)
+        verify(ledgerRepo, never()).save(any())
     }
 
     @Test
@@ -156,21 +129,20 @@ class AssignmentServiceTest {
     }
 
     @Test
-    fun `uncompleteAssignment reverses points`() {
+    fun `uncompleteAssignment clears completedAt without touching points`() {
         val task = makeTask(points = 3)
         val assignment = makeAssignment(
             task = task,
             assignedTo = Assignee.CHILD1,
-            completedAt = LocalDateTime.now(),
-            bonusEarned = true
+            completedAt = LocalDateTime.now()
         )
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
         whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
-        whenever(ledgerRepo.save(any<PointLedger>())).thenAnswer { it.arguments[0] }
 
-        service.uncompleteAssignment(10L)
+        val dto = service.uncompleteAssignment(10L)
 
-        verify(ledgerRepo).save(argThat { delta == -4 && assignee == Assignee.CHILD1 })
+        assertEquals(false, dto.completed)
+        verify(ledgerRepo, never()).save(any())
     }
 
     @Test

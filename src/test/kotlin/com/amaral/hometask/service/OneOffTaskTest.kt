@@ -61,21 +61,6 @@ class OneOffTaskTest {
     }
 
     @Test
-    fun `deleteAssignment on one-off reverses points when completed`() {
-        val task = makeOneOffTask(id = 99L)
-        val assignment = makeAssignment(task = task, completed = true)
-        whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
-        whenever(taskRepo.save(any<Task>())).thenReturn(task.copy(active = false))
-        whenever(ledgerRepo.findByWeekStart(any())).thenReturn(emptyList())
-
-        service.deleteAssignment(10L)
-
-        // Points should be reversed (delta = -1)
-        verify(ledgerRepo).save(argThat { delta == -1 && assignee == Assignee.CHILD1 })
-        verify(assignmentRepo).deleteById(10L)
-    }
-
-    @Test
     fun `deleteAssignment on regular assignment does NOT deactivate task`() {
         val regularTask = Task(
             id = 1L, name = "Aspirar", type = TaskType.DAILY,

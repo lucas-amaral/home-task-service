@@ -56,29 +56,44 @@ class DeleteAssignmentTest {
     }
 
     @Test
-    fun `deleteAssignment reverses points when completed before tombstoning`() {
+    fun `deleteAssignment reverses the −1 occurrence when a penalty had been applied`() {
         val task = regularTask()
         val assignment = Assignment(
             id = 10L, task = task, assignedTo = Assignee.CHILD2,
-            periodDate = monday, completedAt = LocalDateTime.now(), bonusEarned = true
+            periodDate = monday, penaltyApplied = true
         )
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
 
         service.deleteAssignment(10L)
 
-        // task.points(2) + bonus(1) = 3 reversed
-        verify(ledgerRepo).save(argThat { delta == -3 && assignee == Assignee.CHILD2 })
+        verify(ledgerRepo).save(argThat { delta == 1 && assignee == Assignee.CHILD2 })
         verify(assignmentRepo).save(argThat {
             id == 10L &&
             deleted == true &&
             completedAt == null &&
-            !bonusEarned
+            !penaltyApplied
         })
         verify(assignmentRepo, never()).deleteById(any())
     }
 
     @Test
-    fun `deleteAssignment does not reverse points when not completed`() {
+    fun `deleteAssignment does not touch points when completed without penalty`() {
+        val task = regularTask()
+        val assignment = Assignment(
+            id = 10L, task = task, assignedTo = Assignee.CHILD1,
+            periodDate = monday, completedAt = LocalDateTime.now()
+        )
+        whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
+
+        service.deleteAssignment(10L)
+
+        verify(ledgerRepo, never()).save(any())
+        verify(assignmentRepo).save(argThat { deleted == true })
+        verify(assignmentRepo, never()).deleteById(any())
+    }
+
+    @Test
+    fun `deleteAssignment does not reverse points when not completed or penalized`() {
         val task = regularTask()
         val assignment = Assignment(id = 10L, task = task, assignedTo = Assignee.CHILD1, periodDate = monday)
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
@@ -91,18 +106,18 @@ class DeleteAssignmentTest {
     }
 
     @Test
-    fun `deleteAssignment reverses points for BOTH children when joint`() {
+    fun `deleteAssignment reverses penalty for BOTH children when joint`() {
         val task = regularTask()
         val assignment = Assignment(
             id = 10L, task = task, assignedTo = Assignee.BOTH,
-            periodDate = monday, completedAt = LocalDateTime.now()
+            periodDate = monday, penaltyApplied = true
         )
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
 
         service.deleteAssignment(10L)
 
-        verify(ledgerRepo).save(argThat { delta == -2 && assignee == Assignee.CHILD1 })
-        verify(ledgerRepo).save(argThat { delta == -2 && assignee == Assignee.CHILD2 })
+        verify(ledgerRepo).save(argThat { delta == 1 && assignee == Assignee.CHILD1 })
+        verify(ledgerRepo).save(argThat { delta == 1 && assignee == Assignee.CHILD2 })
         verify(assignmentRepo).save(argThat { deleted == true })
     }
 

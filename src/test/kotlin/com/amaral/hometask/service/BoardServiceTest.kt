@@ -60,6 +60,7 @@ class BoardServiceTest {
         whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(dailyTask))
         whenever(familyConfigService.getFamilyConfig()).thenReturn(FamilyConfigDto("TestChild1", "TestChild2", "111", "222"))
         whenever(pointLedgerService.weekPointsMap(monday)).thenReturn(emptyMap())
+        whenever(pointLedgerService.weeklyStatus(monday, "TestChild1", "TestChild2")).thenReturn(emptyList())
         whenever(assignmentService.ensureDailyAssignment(dailyTask, monday)).thenReturn(assignment)
 
         val board = service.getBoard(monday)
@@ -77,6 +78,7 @@ class BoardServiceTest {
         whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(weeklyTask))
         whenever(familyConfigService.getFamilyConfig()).thenReturn(FamilyConfigDto("TestChild1", "TestChild2", "111", "222"))
         whenever(pointLedgerService.weekPointsMap(monday)).thenReturn(emptyMap())
+        whenever(pointLedgerService.weeklyStatus(monday, "TestChild1", "TestChild2")).thenReturn(emptyList())
         whenever(assignmentService.ensureWeeklyAssignment(weeklyTask, monday)).thenReturn(assignment)
 
         val board = service.getBoard(tuesday)
@@ -92,6 +94,7 @@ class BoardServiceTest {
         whenever(taskRepo.findByActiveTrueOrderBySortOrderAsc()).thenReturn(listOf(dailyTask))
         whenever(familyConfigService.getFamilyConfig()).thenReturn(FamilyConfigDto("TestChild1", "TestChild2", "111", "222"))
         whenever(pointLedgerService.weekPointsMap(monday)).thenReturn(emptyMap())
+        whenever(pointLedgerService.weeklyStatus(monday, "TestChild1", "TestChild2")).thenReturn(emptyList())
         whenever(assignmentService.ensureDailyAssignment(dailyTask, monday)).thenReturn(null)
 
         val board = service.getBoard(monday)

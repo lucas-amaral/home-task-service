@@ -1,5 +1,6 @@
 package com.amaral.hometask.model
 
+import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
@@ -15,6 +16,8 @@ data class Task(
     val id: Long = 0,
 
     val name: String,
+
+    @Column(columnDefinition = "TEXT")
     val description: String = "",
 
     @Enumerated(EnumType.STRING)
