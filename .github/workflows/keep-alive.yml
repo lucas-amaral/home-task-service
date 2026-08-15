@@ -1,0 +1,55 @@
+name: Keep backend awake
+
+# Runs every 10 minutes, 24/7 — but the script below only actually pings
+# Render when we're inside one of the real usage windows (below). Outside
+# those windows it's a no-op, so the backend is free to spin down and we
+# don't burn Render's 750 free instance-hours/month for nothing.
+#
+# Usage windows (America/Sao_Paulo, matches the app's own TZ):
+#   06:50–08:00  (café da manhã)
+#   11:50–13:30  (almoço)
+#   17:50–23:00  (jantar / tarefas da noite)
+# ≈ 8h/day, ≈ 240h/month — well under the 750h free cap.
+#
+# Edit the WINDOWS array below to change the schedule. No other file needs
+# to change.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab to test
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend if inside a usage window
+        env:
+          BACKEND_URL: https://home-task-service.onrender.com/api/health
+        run: |
+          now_hm=$(TZ=America/Sao_Paulo date +%H:%M)
+          now_min=$((10#$(TZ=America/Sao_Paulo date +%H) * 60 + 10#$(TZ=America/Sao_Paulo date +%M)))
+
+          # Each window as "start_minutes end_minutes" (minutes since midnight, local time)
+          WINDOWS=(
+            "410 480"    # 06:50–08:00
+            "710 810"    # 11:50–13:30
+            "1070 1380"  # 17:50–23:00
+          )
+
+          in_window=false
+          for w in "${WINDOWS[@]}"; do
+            start=$(echo "$w" | cut -d' ' -f1)
+            end=$(echo "$w" | cut -d' ' -f2)
+            if [ "$now_min" -ge "$start" ] && [ "$now_min" -le "$end" ]; then
+              in_window=true
+              break
+            fi
+          done
+
+          if [ "$in_window" = true ]; then
+            echo "🟢 $now_hm BRT is inside a usage window — pinging backend"
+            curl -sf --max-time 20 "$BACKEND_URL" && echo "✓ ping ok" || echo "✗ ping failed (backend may just be cold-starting, that's fine)"
+          else
+            echo "⚪ $now_hm BRT is outside all usage windows — skipping, letting it sleep"
+          fi
