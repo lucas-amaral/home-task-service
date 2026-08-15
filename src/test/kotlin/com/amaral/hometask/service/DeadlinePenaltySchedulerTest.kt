@@ -62,14 +62,21 @@ class DeadlinePenaltySchedulerTest {
     }
 
     @Test
-    fun `skips UNASSIGNED assignments`() {
-        // findMissedCandidates já filtra assignedTo IN ('CHILD1','CHILD2') — retorna vazio
-        whenever(assignmentRepo.findMissedCandidates(monday, monday)).thenReturn(emptyList())
+    fun `UNASSIGNED assignment is reassigned to BOTH and penalised, not skipped`() {
+        val task = makeTask()
+        val assignment = Assignment(
+            id = 1L, task = task, assignedTo = Assignee.UNASSIGNED,
+            periodDate = monday, completedAt = null,
+            penaltyApplied = false, missedDeadline = false
+        )
+        whenever(assignmentRepo.findMissedCandidates(monday, monday)).thenReturn(listOf(assignment))
 
         val count = service.applyMissedDeadlinePenalties(monday)
 
-        assertEquals(0, count)
-        verify(ledgerRepo, never()).save(any())
+        assertEquals(1, count)
+        verify(ledgerRepo).save(argThat { delta == -1 && assignee == Assignee.CHILD1 })
+        verify(ledgerRepo).save(argThat { delta == -1 && assignee == Assignee.CHILD2 })
+        verify(assignmentRepo).save(argThat { assignedTo == Assignee.BOTH })
     }
 
     @Test
@@ -87,9 +94,9 @@ class DeadlinePenaltySchedulerTest {
         val task1 = makeTask(id = 1L)
         val task2 = makeTask(id = 2L)
         val a1 = Assignment(id = 1L, task = task1, assignedTo = Assignee.CHILD1,
-                            periodDate = monday, penaltyApplied = false, missedDeadline = false)
+            periodDate = monday, penaltyApplied = false, missedDeadline = false)
         val a2 = Assignment(id = 2L, task = task2, assignedTo = Assignee.CHILD2,
-                            periodDate = monday, penaltyApplied = false, missedDeadline = false)
+            periodDate = monday, penaltyApplied = false, missedDeadline = false)
         whenever(assignmentRepo.findMissedCandidates(monday, monday)).thenReturn(listOf(a1, a2))
 
         val count = service.applyMissedDeadlinePenalties(monday)

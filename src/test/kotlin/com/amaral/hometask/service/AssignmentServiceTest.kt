@@ -159,6 +159,21 @@ class AssignmentServiceTest {
     }
 
     @Test
+    fun `applyPenalty on an UNASSIGNED task reassigns it to BOTH and penalises both`() {
+        val task = makeTask()
+        val assignment = makeAssignment(task = task, assignedTo = Assignee.UNASSIGNED)
+        whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
+        whenever(assignmentRepo.save(any<Assignment>())).thenAnswer { it.arguments[0] }
+        whenever(ledgerRepo.save(any<PointLedger>())).thenAnswer { it.arguments[0] }
+
+        val dto = service.applyPenalty(10L)
+
+        verify(ledgerRepo).save(argThat { delta == -1 && assignee == Assignee.CHILD1 })
+        verify(ledgerRepo).save(argThat { delta == -1 && assignee == Assignee.CHILD2 })
+        assertEquals(Assignee.BOTH, dto.assignedTo)
+    }
+
+    @Test
     fun `deleteAssignment creates tombstone instead of hard deleting`() {
         val assignment = makeAssignment()
         whenever(assignmentRepo.findById(10L)).thenReturn(Optional.of(assignment))
@@ -168,11 +183,11 @@ class AssignmentServiceTest {
 
         verify(assignmentRepo).save(argThat {
             id == 10L &&
-            deleted == true &&
-            completedAt == null &&
-            !bonusEarned &&
-            !penaltyApplied &&
-            !missedDeadline
+                    deleted == true &&
+                    completedAt == null &&
+                    !bonusEarned &&
+                    !penaltyApplied &&
+                    !missedDeadline
         })
         verify(assignmentRepo, never()).deleteById(any())
     }
@@ -191,8 +206,8 @@ class AssignmentServiceTest {
         assertEquals(Assignee.CHILD2, dto.assignedTo)
         verify(assignmentRepo).save(argThat {
             id == deletedAssignment.id &&
-            deleted == false &&
-            assignedTo == Assignee.CHILD2
+                    deleted == false &&
+                    assignedTo == Assignee.CHILD2
         })
     }
 }

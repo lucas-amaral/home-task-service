@@ -32,7 +32,7 @@ class DeadlinePenaltyTest {
         periodDate: LocalDate? = monday,
         periodWeek: LocalDate? = null
     ) = Assignment(id = id, task = task, assignedTo = assignedTo,
-                   periodDate = periodDate, periodWeek = periodWeek)
+        periodDate = periodDate, periodWeek = periodWeek)
 
     @BeforeEach
     fun setup() {
@@ -76,15 +76,31 @@ class DeadlinePenaltyTest {
     }
 
     @Test
-    fun `UNASSIGNED assignment is never penalised`() {
-        // findMissedCandidates already filters out UNASSIGNED at the DB level,
-        // but even if one slips through the service resolvePersons returns empty
-        whenever(assignmentRepo.findMissedCandidates(tuesday, monday)).thenReturn(emptyList())
+    fun `UNASSIGNED assignment past deadline is reassigned to BOTH and both are penalised`() {
+        // Nobody claimed it before the deadline — responsibility falls on both
+        // children, and the assignment itself is reassigned to BOTH so the
+        // board reflects it (not just penalised as if it were).
+        val a = makeAssignment(assignedTo = Assignee.UNASSIGNED, periodDate = tuesday)
+        whenever(assignmentRepo.findMissedCandidates(tuesday, monday)).thenReturn(listOf(a))
 
         val count = service.applyMissedDeadlinePenalties(tuesday)
 
-        assertEquals(0, count)
-        verify(ledgerRepo, never()).save(any())
+        assertEquals(1, count)
+        verify(ledgerRepo).save(argThat { delta == -1 && assignee == Assignee.CHILD1 })
+        verify(ledgerRepo).save(argThat { delta == -1 && assignee == Assignee.CHILD2 })
+        verify(assignmentRepo).save(argThat { assignedTo == Assignee.BOTH && missedDeadline && penaltyApplied })
+    }
+
+    @Test
+    fun `BOTH-assignee (joint) missed task penalises both children`() {
+        val a = makeAssignment(assignedTo = Assignee.BOTH, periodDate = tuesday)
+        whenever(assignmentRepo.findMissedCandidates(tuesday, monday)).thenReturn(listOf(a))
+
+        val count = service.applyMissedDeadlinePenalties(tuesday)
+
+        assertEquals(1, count)
+        verify(ledgerRepo).save(argThat { delta == -1 && assignee == Assignee.CHILD1 })
+        verify(ledgerRepo).save(argThat { delta == -1 && assignee == Assignee.CHILD2 })
     }
 
     @Test

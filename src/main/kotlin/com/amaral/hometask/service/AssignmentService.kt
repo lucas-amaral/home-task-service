@@ -103,10 +103,13 @@ class AssignmentService(
         check(!assignment.missedDeadline) {
             "Cannot manually remove a missed-deadline penalty (applied by the scheduler)"
         }
+        // Same rule as the deadline scheduler: nobody having claimed the task
+        // isn't a loophole — it falls on both children.
+        val effectiveAssignee = if (assignment.assignedTo == Assignee.UNASSIGNED) Assignee.BOTH else assignment.assignedTo
         val week = weekStart(assignment.displayDate)
-        resolvePersons(assignment.assignedTo)
+        resolvePersons(effectiveAssignee)
             .forEach { addLedger(it, week, -1, "Manual penalty: ${assignment.task.name}") }
-        return assignmentRepo.save(assignment.copy(penaltyApplied = true)).toDto()
+        return assignmentRepo.save(assignment.copy(assignedTo = effectiveAssignee, penaltyApplied = true)).toDto()
     }
 
     @Transactional
@@ -178,8 +181,16 @@ class AssignmentService(
             }
 
         candidates.forEach { a ->
-            assignmentRepo.save(a.copy(missedDeadline = true, penaltyApplied = true))
-            resolvePersons(a.assignedTo)
+            // Nobody claimed it before the deadline: the responsibility falls on
+            // both children equally, per house rule — it's actually reassigned
+            // to BOTH (not just penalized as if it were), so the board reflects
+            // what happened.
+            val effectiveAssignee = if (a.assignedTo == Assignee.UNASSIGNED) Assignee.BOTH else a.assignedTo
+
+            assignmentRepo.save(
+                a.copy(assignedTo = effectiveAssignee, missedDeadline = true, penaltyApplied = true)
+            )
+            resolvePersons(effectiveAssignee)
                 .forEach { person -> addLedger(person, week, -1, "Missed deadline: ${a.task.name}") }
         }
 

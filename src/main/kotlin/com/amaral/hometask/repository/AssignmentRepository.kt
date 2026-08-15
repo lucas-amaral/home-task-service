@@ -109,7 +109,6 @@ interface AssignmentRepository : JpaRepository<Assignment, Long> {
           AND a.penaltyApplied = false
           AND a.missedDeadline = false
           AND COALESCE(a.deleted, false) = false
-          AND a.assignedTo IN ('CHILD1', 'CHILD2')
           AND (a.periodDate = :date OR a.periodWeek = :weekStart)
     """)
     fun findMissedCandidates(date: LocalDate, weekStart: LocalDate): List<Assignment>
