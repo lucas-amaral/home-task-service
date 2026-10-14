@@ -3,6 +3,7 @@ package com.amaral.hometask.service
 import com.amaral.hometask.util.DateTimeUtils
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.annotation.Lazy
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Component
  * the hour comparison is done in the family's local time, not UTC.
  */
 @Component
+@Lazy(false)
 class DeadlineNotificationScheduler(
     private val assignmentService: AssignmentService,
     private val notificationService: WhatsAppNotificationService,

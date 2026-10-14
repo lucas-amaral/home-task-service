@@ -12,6 +12,7 @@ import com.amaral.hometask.repository.TaskRepository
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Lazy
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import jakarta.annotation.PostConstruct
@@ -27,6 +28,7 @@ class CorsConfig(@Value("\${app.frontend-url}") private val frontendUrl: String)
 }
 
 @Configuration
+@Lazy(false)
 class DataSeeder(
     private val taskRepo: TaskRepository,
     private val rewardRepo: RewardRepository,

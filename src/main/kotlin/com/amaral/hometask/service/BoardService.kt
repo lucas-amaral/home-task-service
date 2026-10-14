@@ -31,6 +31,26 @@ class BoardService(
         val week = DateTimeUtils.weekStart(date)
         val cfg  = familyConfigService.getFamilyConfig()
 
+        return BoardDto(
+            date = date, weekStart = week,
+            child1Name = cfg.child1Name, child2Name = cfg.child2Name,
+            assignments = ensureAssignments(date).map { it.toDto() },
+            weekPoints  = pointLedgerService.weekPointsMap(week),
+            weeklyStatus = pointLedgerService.weeklyStatus(week, cfg.child1Name, cfg.child2Name)
+        )
+    }
+
+    /**
+     * Makes sure every recurring task has its assignment for [date] (and its week), and returns
+     * the visible ones plus the one-offs of the day. Safe to repeat: nothing is created twice.
+     *
+     * Used by the board and by the daily routine, so the day's tasks exist even when nobody
+     * opens the board that day.
+     */
+    @Transactional
+    fun ensureAssignments(date: LocalDate): List<Assignment> {
+        val week = DateTimeUtils.weekStart(date)
+
         // Only recurring tasks drive automatic assignment creation
         val recurringTasks = taskRepo.findByActiveTrueOrderBySortOrderAsc()
             .filter { !it.oneOff }
@@ -59,13 +79,7 @@ class BoardService(
         val oneOffToday = assignmentRepo.findByPeriodDate(date)
             .filter { it.task.oneOff }
 
-        return BoardDto(
-            date = date, weekStart = week,
-            child1Name = cfg.child1Name, child2Name = cfg.child2Name,
-            assignments = (assignments + oneOffToday).map { it.toDto() },
-            weekPoints  = pointLedgerService.weekPointsMap(week),
-            weeklyStatus = pointLedgerService.weeklyStatus(week, cfg.child1Name, cfg.child2Name)
-        )
+        return assignments + oneOffToday
     }
 
     private fun Assignment?.toVisibleList(): List<Assignment> =

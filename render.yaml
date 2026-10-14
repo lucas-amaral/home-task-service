@@ -30,3 +30,13 @@ services:
         sync: false
       - key: WHATSAPP_PARENTS
         sync: false
+      # Optional: protects POST /api/cron/* (unset = those endpoints answer 503)
+      - key: CRON_TOKEN
+        sync: false
+      # Push notifications to the children's phones: generate once with ./gradlew generateVapidKeys
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false        # e.g. mailto:you@example.com

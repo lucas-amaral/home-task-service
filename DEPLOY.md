@@ -66,6 +66,33 @@ WHATSAPP_PARENTS    = whatsapp:+55...
 Leave these unset to skip WhatsApp notifications entirely — nothing else
 depends on them.
 
+### Daily jobs and push reminders
+
+```text
+VAPID_PUBLIC_KEY  = <from ./gradlew generateVapidKeys>
+VAPID_PRIVATE_KEY = <from ./gradlew generateVapidKeys>
+VAPID_SUBJECT     = mailto:<a contact e-mail>
+```
+
+- `./gradlew generateVapidKeys` prints a new key pair. Generate it **once**: changing
+  the keys invalidates every phone already subscribed.
+- The free instance sleeps, so the in-app `@Scheduled` jobs only fire when it happens
+  to be awake. To cover that, `WakeUpCatchUp` runs on every start: it closes yesterday,
+  creates today's tasks and sends the reminder of the current window (noon: 12:00–19:00,
+  evening: 19:00–22:00) if it has not gone out yet. Everything is idempotent.
+- So the reminders only need *something* to wake the service at 12:00 and 19:00
+  (Brasília). Use a scheduled-URL service made for that, e.g. [cron-job.org](https://cron-job.org)
+  (free): two jobs doing `GET https://<service>.onrender.com/api/health`, one at 12:00 and one
+  at 19:00, timezone America/Sao_Paulo. If nobody wakes it, the reminders simply go out the
+  next time someone opens the board inside the window.
+- **Do not use GitHub Actions for this.** GitHub's terms forbid using hosted runners for
+  activity unrelated to building, testing, deploying or publishing the repository's
+  software — scheduled pings/keep-alive included — and the account can be suspended.
+- Optional: `CRON_TOKEN` (e.g. `openssl rand -hex 32`) enables `POST /api/cron/daily` and
+  `POST /api/cron/reminders?slot=NOON|EVENING` with the header `X-Cron-Token`, to run the
+  jobs by hand. Without it those endpoints answer 503. Without the VAPID keys the
+  reminders are skipped (and not logged, so they go out once the keys are set).
+
 5. Deploy. Render builds the Docker image and starts the service.
 6. Copy the generated URL, e.g. `https://home-task-service.onrender.com`.
 
@@ -123,3 +150,9 @@ Any `git push` to `main` triggers an automatic redeploy on Render.
 | GET  | `/api/rewards` | List rewards (optional, not tied to the automatic system) |
 | GET  | `/api/points/history` | Points history by week |
 | GET  | `/api/points/status?weekStart=` | Occurrence count + consequence ladder per child |
+| POST | `/api/cron/daily` | Closes yesterday (missed → penalty) and creates today's assignments. Header `X-Cron-Token` |
+| POST | `/api/cron/reminders?slot=NOON\|EVENING` | Pushes each child the tasks still open today (once per slot/day). Header `X-Cron-Token` |
+| GET  | `/api/push/public-key` | VAPID public key and whether push is enabled |
+| POST | `/api/push/subscriptions` | Subscribes a device `{endpoint, p256dh, auth, assignee: CHILD1\|CHILD2}` |
+| DELETE | `/api/push/subscriptions` | Unsubscribes a device `{endpoint}` |
+| POST | `/api/push/test` | Sends a test notification to a device `{endpoint}` |

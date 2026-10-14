@@ -30,6 +30,9 @@ dependencies {
     implementation("org.postgresql:postgresql")
     implementation("com.h2database:h2")
     implementation("com.zaxxer:HikariCP")
+    // Web Push (VAPID) for the reminders sent to the children's phones
+    implementation("nl.martijndwars:web-push:5.1.1")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.mockito.kotlin:mockito-kotlin:6.1.0")
@@ -53,4 +56,12 @@ tasks.withType<Test> {
 
 tasks.named<BootJar>("bootJar") {
     archiveFileName.set("home-task-service.jar")
+}
+
+// Prints a new pair of VAPID keys for Web Push: ./gradlew generateVapidKeys
+tasks.register<JavaExec>("generateVapidKeys") {
+    group = "application"
+    description = "Generates the VAPID key pair used to send push notifications"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.amaral.hometask.tools.VapidKeyGeneratorKt")
 }
