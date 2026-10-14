@@ -30,6 +30,9 @@ dependencies {
     implementation("org.postgresql:postgresql")
     implementation("com.h2database:h2")
     implementation("com.zaxxer:HikariCP")
+    // Flyway owns the production schema (src/main/resources/db/migration)
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-database-postgresql")
     // Web Push (VAPID) for the reminders sent to the children's phones
     implementation("nl.martijndwars:web-push:5.1.1")
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
@@ -37,6 +40,11 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.mockito.kotlin:mockito-kotlin:6.1.0")
     testImplementation("com.h2database:h2")
+    // Real PostgreSQL for PostgresMigrationTest, no Docker needed (same as finch-service)
+    testImplementation("io.zonky.test:embedded-postgres:2.1.0")
+    testImplementation(platform("io.zonky.test.postgres:embedded-postgres-binaries-bom:16.9.0"))
+    testRuntimeOnly("io.zonky.test.postgres:embedded-postgres-binaries-darwin-arm64v8")
+    testRuntimeOnly("io.zonky.test.postgres:embedded-postgres-binaries-linux-amd64")
 }
 
 tasks.withType<KotlinJvmCompile> {
@@ -52,6 +60,11 @@ tasks.withType<JavaCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+// Pinned because tools/VapidKeyGenerator also has a main(); without it bootJar can't pick one.
+springBoot {
+    mainClass.set("com.amaral.hometask.HomeTaskServiceApplicationKt")
 }
 
 tasks.named<BootJar>("bootJar") {

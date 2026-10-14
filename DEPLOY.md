@@ -26,6 +26,9 @@ Either format works as-is — the backend parses it automatically
 (`config/DatabaseConfig.kt`), adding `sslmode=require` if it's missing.
 You do **not** need to prefix it with `jdbc:` yourself.
 
+Use the **direct** connection string, not Neon's `-pooler` host or Supabase's
+transaction pooler: Flyway runs the migrations at boot and expects a normal session.
+
 ## 2. Deploy the backend to Render
 
 **Option A — Blueprint (recommended):**
@@ -97,8 +100,34 @@ VAPID_SUBJECT     = mailto:<a contact e-mail>
 6. Copy the generated URL, e.g. `https://home-task-service.onrender.com`.
 
 > **Free tier note:** the service spins down after ~15 min of inactivity and
-> takes 30–60s to wake up on the next request. That's fine for a household
-> board — the very first tap of the day might just take a moment.
+> the next request waits for it to boot again (about 3 min measured on
+> 14/10/2026, most of it Render bringing the container up). That's fine for a
+> household board — the very first tap of the day might just take a moment.
+
+### Boot settings (keep them)
+
+Every wake-up pays the full boot on 0.1 CPU, so the app is tuned the same way as
+finch-service:
+
+- `Dockerfile`: Java 21 runtime and
+  `JAVA_TOOL_OPTIONS="-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -XX:MaxRAMPercentage=70"`
+  (C1 only, single-threaded GC, heap sized to the 512 MB container).
+- `spring.main.lazy-initialization=true`: beans are created on first use. Anything
+  that has to exist from the start carries `@Lazy(false)` — the `@Scheduled` jobs,
+  `SchedulingConfig`, `DataSeeder` (which otherwise would never seed) and
+  `WakeUpCatchUp`. `SchedulingStartupTest` fails if a job or the seed stops
+  running at boot; add new boot-time beans there.
+- `spring.threads.virtual.enabled=true` (only active on Java 21, i.e. in Docker).
+- Flyway owns the production schema (`src/main/resources/db/migration`) and
+  `ddl-auto=none`, so Hibernate no longer inspects every table at boot (it used to
+  run `ddl-auto=update` plus the `SchemaInitializer` ALTERs). `V1__baseline.sql` is
+  idempotent and Flyway baselines a pre-existing database at version 0, so on the
+  first deploy V1 runs over the existing tables and only adds what is missing
+  (e.g. `push_subscriptions`, `reminder_log`). Schema changes from now on are new
+  `V2__…`, `V3__…` files; `PostgresMigrationTest` checks them against the entities
+  on a real PostgreSQL.
+- `build.gradle.kts` pins `springBoot.mainClass`, because `tools/VapidKeyGenerator`
+  also has a `main()` and `bootJar` would fail to pick one.
 
 ## 3. Point the frontend at the backend
 
